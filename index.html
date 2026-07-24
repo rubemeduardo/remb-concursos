@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>REMB Concursos - Plataforma de Estudos</title>
+    
+    <!-- Meta tags SEO -->
+    <meta name="description" content="Plataforma de estudos ativa e de alto rendimento para concursos públicos.">
+    <meta name="keywords" content="sala de questões, concurso público, estudo ativo, lei seca, mnemônicos">
+    
+    <!-- Bootstrap 5.3.3 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Swiper 11 CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
+    
+    <!-- CSS principal (Customizado) -->
+    <link rel="stylesheet" href="css/style.css">
+    
+    <!-- Elemento para estilo dinâmico de seleção de texto -->
+    <style id="dynamic-selection-style"></style>
+</head>
+<body>
+
+    <!-- Topbar Mobile -->
+    <div class="mobile-topbar" style="display: none;">
+        <button class="btn-burger" onclick="toggleMobileSidebar()">☰</button>
+        <div class="app-logo-mobile">🎓 REMB <span>ESTUDOS</span></div>
+    </div>
+    
+    <!-- Backdrop do Menu Lateral no Mobile -->
+    <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleMobileSidebar()"></div>
+
+    <!-- APLICATIVO SPA CONTAINER -->
+    <div class="app-layout">
+        
+        <!-- SIDEBAR DE NAVEGAÇÃO -->
+        <aside class="app-sidebar">
+            <div class="sidebar-header">
+                <div class="app-logo">
+                    <span>🎓</span>
+                    <h2>REMB <span>ESTUDOS</span></h2>
+                </div>
+            </div>
+            
+            <nav class="sidebar-menu">
+                <button class="menu-item active" id="btn-nav-dashboard" onclick="navegarPara('dashboard')">
+                    <span class="menu-icon">🏠</span>
+                    <span class="menu-label">Início</span>
+                </button>
+                <button class="menu-item" id="btn-nav-questoes" onclick="navegarPara('questoes')">
+                    <span class="menu-icon">✍️</span>
+                    <span class="menu-label">Sala de Questões</span>
+                </button>
+                
+                
+                
+                
+                
+            </nav>
+            
+            <div class="sidebar-footer">
+                <!-- Controle de Cronômetro Flutuante -->
+                <div class="sidebar-timer">
+                    <span class="timer-icon">⏱️</span>
+                    <span id="timerDisplay">00:00</span>
+                    <button class="timer-action-btn" id="playPauseBtn" onclick="toggleTimer()" title="Pausar/Retomar">⏸️</button>
+                </div>
+                
+                <!-- Toggle de Tema Escuro -->
+                <button class="theme-switch-btn" onclick="toggleTheme()" id="themeToggleBtn" title="Alternar tema">
+                    🌙 Modo Escuro
+                </button>
+            </div>
+        </aside>
+
+        <!-- CONTEÚDO PRINCIPAL -->
+        <main class="app-content">
+            
+            <!-- SEÇÃO 1: DASHBOARD (HOME) -->
+            <section id="section-dashboard" class="content-section active">
+                <div class="section-header">
+                    <h1>Área de Estudos REMB <span class="username">Estudante</span>! 🎯</h1>
+                    <p class="section-subtitle">Acompanhe seu progresso por engenharia reversa em tempo real.</p>
+                </div>
+                
+                <!-- Grid de Métricas Principais (Bootstrap cards) -->
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-icon">📝</div>
+                        <div class="metric-info">
+                            <span class="metric-title">Respondidas</span>
+                            <span class="metric-value" id="dashTotal">0</span>
+                        </div>
+                    </div>
+                    <div class="metric-card success">
+                        <div class="metric-icon">🟢</div>
+                        <div class="metric-info">
+                            <span class="metric-title">Acertos</span>
+                            <span class="metric-value" id="dashAcertos">0</span>
+                        </div>
+                    </div>
+                    <div class="metric-card danger">
+                        <div class="metric-icon">🔴</div>
+                        <div class="metric-info">
+                            <span class="metric-title">Erros</span>
+                            <span class="metric-value" id="dashErros">0</span>
+                        </div>
+                    </div>
+                    <div class="metric-card accent">
+                        <div class="metric-icon">📈</div>
+                        <div class="metric-info">
+                            <span class="metric-title">Aproveitamento</span>
+                            <span class="metric-value" id="dashAproveitamento">0%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Painel de Detalhes de Desempenho e Matérias -->
+                <div class="dashboard-details-grid">
+                    <div class="details-card">
+                        <h3>📊 Aproveitamento por Disciplina</h3>
+                        <div class="disciplines-container" id="disciplinesProgressList">
+                            <!-- Injetado por JS -->
+                        </div>
+                    </div>
+                    
+                    <div class="details-card info-card">
+                        <h3>💡 Estudo Ativo e Engenharia Reversa</h3>
+                        <p>Aproveite ao máximo nossa plataforma de estudos:</p>
+                        <ul class="study-tips-list">
+                            <li><span>💬</span> <strong>Modo Correção:</strong> Ao responder, entre no modo correção para ver os balões estilo quadrinhos apontando direto no texto.</li>
+                            <li><span>✏️</span> <strong>Caneta e Borracha:</strong> Use a barra móvel de marcação lateral para pintar termos-chave com 4 cores ou apagá-los.</li>
+                            <li><span>❌</span> <strong>x taxativo:</strong> Clique no botão `✖` nas alternativas para tachar as erradas.</li>
+                            <li><span>💾</span> <strong>Minhas Notas:</strong> Salve explicações dos balões ou digite suas notas para vê-las todas na aba dedicada.</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SEÇÃO 2: SALA DE QUESTÕES -->
+            <section id="section-questoes" class="content-section">
+                <div class="section-header">
+                    <h1>✍️ Sala de Questões</h1>
+                    <p class="section-subtitle">Resolva e analise questões com nosso assistente pedagógico integrado.</p>
+                </div>
+                
+                <!-- Painel de Filtros e Busca -->
+                <div class="filters-panel">
+                    <div class="filter-row">
+                        <div class="filter-group">
+                            <label for="filterDisciplina">Disciplina</label>
+                            <select id="filterDisciplina" onchange="aplicarFiltros()">
+                                <option value="todas">Todas as Disciplinas</option>
+                                <!-- Injetado por JS -->
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="filterAssunto">Assunto</label>
+                            <select id="filterAssunto" onchange="aplicarFiltros()">
+                                <option value="todos">Todos os Assuntos</option>
+                                <!-- Injetado por JS -->
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="filterBanca">Banca</label>
+                            <select id="filterBanca" onchange="aplicarFiltros()">
+                                <option value="todas">Todas as Bancas</option>
+                                <option value="FGV">FGV</option>
+                                <option value="Cebraspe">Cebraspe</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="filterListaOrigem">Lista de Origem</label>
+                            <select id="filterListaOrigem" onchange="aplicarFiltros()">
+                                <option value="todas">Todas as Listas</option>
+                                <!-- Injetado por JS -->
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="filterStatus">Status</label>
+                            <select id="filterStatus" onchange="aplicarFiltros()">
+                                <option value="todos">Todas</option>
+                                <option value="nao_respondidas">Não respondidas</option>
+                                <option value="acertadas">Acertadas</option>
+                                <option value="erradas">Erradas</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Busca Avançada por Tags (Estilo Tags-Input) -->
+                    <div class="filter-row search-row">
+                        <div class="tags-input-container">
+                            <span class="search-icon">🏷️</span>
+                            <div class="tags-pill-wrapper" id="tagsPillWrapper">
+                                <!-- As tags ativas entrarão aqui como blocos -->
+                            </div>
+                            
+                            <div class="input-autocomplete-wrapper" style="position: relative; flex: 1; display: flex;">
+                                <!-- Texto fantasma para sugestão inline -->
+                                <span id="ghostSuggestion" style="position: absolute; left: 0; top: 50%; transform: translateY(-50%); color: #cbd5e1; pointer-events: none; font-size: 0.95rem; white-space: pre; font-family: var(--font-body);"></span>
+                                <input type="text" id="searchTags" placeholder="Digite uma tag (ex: pegadinha, LRF) e dê Enter..." autocomplete="off" style="position: relative; background: transparent; z-index: 2; width: 100%; border: none; outline: none; padding: 4px 0;">
+                            </div>
+                            
+                            <!-- Dropdown de Autocompletar Tags -->
+                            <div class="autocomplete-tags-dropdown" id="autocompleteTagsDropdown" style="display: none;">
+                                <!-- Sugestões dinâmicas injetadas por JS -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Container de Questões -->
+                <div class="questoes-list" id="questoesContainer">
+                    <!-- Injetado por JS -->
+                </div>
+            </section>
+
+            <!-- SEÇÃO 7: LABORATÓRIO DE VALIDAÇÃO -->
+            <section id="section-validacao" class="content-section">
+                <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap: wrap; gap: 15px;">
+                    <div>
+                        <h1>🧪 Laboratório de Validação</h1>
+                        <p class="section-subtitle">Examine as afirmativas de Certo/Errado antes de integrá-las. <strong id="curacao-status" style="margin-left: 10px;">0 aprovadas para envio</strong>.</p>
+                    </div>
+                    <button class="btn btn-success font-weight-bold" onclick="integrarQuestoesCespeValidadas()" style="padding: 12px 24px; border-radius:12px; font-size:1rem; border:2.5px solid #000; box-shadow: 4px 4px 0px #000; font-weight:700;">
+                        ✅ Solicitar Integração no Chat
+                    </button>
+                </div>
+                
+                <!-- Filtros e Busca da Validação -->
+                <div class="filters-panel">
+                    <div class="filter-row">
+                        <div class="filter-group">
+                            <label for="filterListaVal">Lista de Origem</label>
+                            <select id="filterListaVal" onchange="aplicarFiltrosVal()">
+                                <option value="todas">Todas as Listas</option>
+                                <!-- Preenchido dinamicamente por JS -->
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="filterStatusVal">Status / Filtro</label>
+                            <select id="filterStatusVal" onchange="aplicarFiltrosVal()">
+                                <option value="todas">Todas as Questões</option>
+                                <option value="aprovadas">Aprovadas (Consistentes)</option>
+                                <option value="pendentes">Pendentes de Curadoria</option>
+                                <option value="com_gabarito">Com Gabarito identificado</option>
+                                <option value="sem_gabarito">Sem Gabarito (Para preencher)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Container de Questões de Validação -->
+                <div class="questoes-list" id="validacaoContainer">
+                    <!-- Injetado por JS -->
+                </div>
+            </section>
+
+            <!-- SEÇÃO 3: CADERNO DE ERROS -->
+            <section id="section-caderno-erros" class="content-section">
+                <div class="section-header">
+                    <h1>📕 Caderno de Erros</h1>
+                    <p class="section-subtitle">Aqui estão reunidas as questões que você errou. Refaça-as para fortalecer sua retenção.</p>
+                </div>
+                
+                <!-- Container do Caderno de Erros -->
+                <div class="questoes-list" id="cadernoErrosContainer">
+                    <!-- Injetado por JS -->
+                </div>
+            </section>
+
+            <!-- SEÇÃO 4: FAVORITAS -->
+            <section id="section-favoritas" class="content-section">
+                <div class="section-header">
+                    <h1>⭐ Questões Favoritas</h1>
+                    <p class="section-subtitle">Revise e resolva rapidamente as questões que você favoritou para revisão futura.</p>
+                </div>
+                
+                <!-- Container de Favoritas -->
+                <div class="questoes-list" id="favoritasContainer">
+                    <!-- Injetado por JS -->
+                </div>
+            </section>
+
+            <!-- SEÇÃO 5: MINHAS NOTAS -->
+            <section id="section-minhas-notas" class="content-section">
+                <div class="section-header">
+                    <h1>✏️ Minhas Notas & Explicações</h1>
+                    <p class="section-subtitle">Revise todas as suas anotações pessoais e explicações salvas dos balões pedagógicos.</p>
+                </div>
+                
+                <!-- Container de Notas -->
+                <div class="row g-4" id="minhasNotasContainer">
+                    <!-- Injetado por JS -->
+                </div>
+            </section>
+
+            <!-- SEÇÃO 6: CONFIGURAÇÕES / AJUSTES -->
+            <section id="section-configuracoes" class="content-section">
+                <div class="section-header">
+                    <h1>⚙️ Ajustes e Configurações</h1>
+                    <p class="section-subtitle">Gerencie suas preferências e dados locais da plataforma.</p>
+                </div>
+                
+                <div class="config-card">
+                    <h3>🗑️ Limpar Progresso e Histórico</h3>
+                    <p>Isso apagará todo o seu progresso de acertos/erros, anotações de fóruns e favoritos salvos localmente neste navegador.</p>
+                    <button class="btn-danger" onclick="resetarDadosGerais()">
+                        Limpar Todos os Dados
+                    </button>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- MODO FOCO (MODAL FULLSCREEN DE ISOLAMENTO) -->
+    <div class="foco-overlay" id="focoOverlay" onclick="fecharModoFoco()"></div>
+    <div class="foco-modal" id="focoModal">
+        <div class="foco-wrapper">
+            <div class="foco-header">
+                <h3>🔍 Modo Foco - Resolução Ativa</h3>
+                <button class="modal-close-btn" onclick="fecharModoFoco()" title="Fechar modo foco">&times;</button>
+            </div>
+            
+            <div class="foco-body" id="focoModalConteudo">
+                <!-- A questão ativa do foco será injetada aqui -->
+            </div>
+            
+            <div class="foco-footer">
+                <button class="btn-secundario" id="btnFocoAnterior" onclick="anteriorQuestaoFoco()">
+                    ◀ Questão Anterior
+                </button>
+                <span class="foco-tip-label">
+                    Dica: Use as setas ◀ ▶ do teclado para navegar | Teclas A-E para marcar | Enter para responder
+                </span>
+                <button class="btn-secundario" id="btnFocoProximo" onclick="proximaQuestaoFoco()">
+                    Próxima Questão ▶
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- BALÃO EXPLICATIVO PEDAGÓGICO (ESTILO COMIC/QUADRINHOS) -->
+    <div id="balao-pedagogico" class="balao-explicativo-popup" style="display: none;">
+        <div class="balao-body" id="balao-conteudo"></div>
+        <div class="balao-footer-comic">
+            <button class="btn-balao-action btn-salvar-nota" onclick="salvarBalaoEmMinhasNotas()" title="Salvar explicação nas Minhas Notas">
+                💾 Salvar Nota
+            </button>
+            <div class="balao-nav-btns">
+                <button class="btn-balao-nav" id="btn-balao-voltar" onclick="voltarPassoBalao()">◀</button>
+                <span id="balao-passo-label">1/4</span>
+                <button class="btn-balao-nav btn-avancar" id="btn-balao-avancar" onclick="avancarPassoBalao()">▶</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- BARRA MÓVEL DE MARCAÇÃO FLUTUANTE ARRASTÁVEL (STICKY HIGHLIGHTER) -->
+    <div class="sticky-highlighter-bar" id="stickyHighlighterBar">
+        <div class="highlighter-drag-handle" id="highlighterDragHandle" title="Clique e arraste para reposicionar a barra">⋮⋮</div>
+        <div class="highlighter-title">🖍️ Caneta</div>
+        <button class="highlighter-color btn-amarelo active" onclick="setCanetaAtiva('yellow', this)" title="Amarelo: Palavras-chave / Restrições / Exceções"></button>
+        <button class="highlighter-color btn-verde" onclick="setCanetaAtiva('green', this)" title="Verde: Comando da Questão (Ação)"></button>
+        <button class="highlighter-color btn-azul" onclick="setCanetaAtiva('blue', this)" title="Azul: Normas e Leis (Artigos, Resoluções)"></button>
+        <button class="highlighter-color btn-rosa" onclick="setCanetaAtiva('pink', this)" title="Rosa: Datas, Prazos e Períodos temporais"></button>
+        <button class="highlighter-color btn-laranja" onclick="setCanetaAtiva('orange', this)" title="Laranja: Situação Fática / Fatos Relevantes"></button>
+        <button class="highlighter-eraser" onclick="setCanetaAtiva('eraser', this)" title="Borracha (Apagar trechos selecionados)"></button>
+    </div>
+
+    <!-- BOTÃO FLUTUANTE PARA SAIR DO MODO CORREÇÃO -->
+    <div id="btn-sair-correcao" class="btn-sair-correcao-flutuante" onclick="fecharModoCorrecao()" style="display: none;">
+        Sair do Modo Correção ✕
+    </div>
+
+    <!-- GSAP (GreenSock Animation Platform) -->
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+    
+    <!-- Swiper 11 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+
+    <!-- Bootstrap 5.3.3 JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bundle.min.js"></script>
+
+    <!-- MathJax for LaTeX equations -->
+    <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']]
+      },
+      svg: {
+        fontCache: 'global'
+      }
+    };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+    <!-- JS SCRIPTS -->
+    <script src="js/banco_questoes.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
