@@ -11,6 +11,7 @@ let timerPausado = false;
 
 // Ferramenta de Caneta Ativa
 let canetaAtiva = null; // null | 'yellow' | 'green' | 'blue' | 'pink' | 'eraser'
+let activeQuestionId = null;
 
 // Estado de progresso padrão (tagsCustomizadas incluído para evitar erros de leitura)
 let progressoUsuario = {
@@ -20,7 +21,8 @@ let progressoUsuario = {
     anotacoes: {},       // { questionId: "minha nota pessoal" }
     comentariosForum: {},// { questionId: [ {usuario, data, texto} ] }
     baloesSalvos: {},    // { questionId: [ "texto do balao 1", ... ] }
-    tagsCustomizadas: {} // { questionId: [ "minha tag", ... ] }
+    tagsCustomizadas: {},// { questionId: [ "minha tag", ... ] }
+    planner: { cicloAtivo: false, config: {}, progresso: { totalRealizado: 0, historicoDias: {}, questoesCiclo: [] } }
 };
 
 // Dados para o Modo Correção
@@ -76,7 +78,100 @@ function atualizarVisualizacaoPaginada(key) {
 
 // Tags selecionadas para o filtro
 let tagsFiltroAtivas = [];
-let globalGhostTag = null; // Guarda a tag autocompletada ativa para o autocomplete inline
+let globalGhostTag = null;
+let globalProvaAtiva = null; // Guarda a tag autocompletada ativa para o autocomplete inline
+
+const BANCO_PROVAS = [
+    // Cebraspe
+    { id: "cebraspe-tcu-2026", banca: "Cebraspe", ano: "2026", orgao: "TCU", cargo: "Auditor Federal de Controle Externo (TI)", nivel: "Superior", file: "cespe-cebraspe-2026-tcu-auditor-federal-de-controle-externo-area-de-controle-externo-orientacao-auditoria-de-tecnologia-da-informacao-prova.pdf" },
+    { id: "cebraspe-tcepr-2026", banca: "Cebraspe", ano: "2026", orgao: "TCE-PR", cargo: "Auditor de Controle Externo", nivel: "Superior", file: "tce_pr_2026.json" },
+    { id: "cebraspe-bnb-2025", banca: "Cebraspe", ano: "2025", orgao: "Banco do Nordeste (BNB)", cargo: "Analista Bancário", nivel: "Médio / Superior", file: "bnb_2025.json" },
+    { id: "cebraspe-caixa-2024", banca: "Cebraspe", ano: "2024", orgao: "Caixa Econômica Federal (T.I.)", cargo: "Engenheiro de Segurança / Médico", nivel: "Superior", file: "caixa_2024_cespe.json" },
+    { id: "cebraspe-agu-2023", banca: "Cebraspe", ano: "2023", orgao: "Advocacia-Geral da União (AGU)", cargo: "Advogado da União / Procurador", nivel: "Superior", file: "agu_2023.json" },
+    { id: "cebraspe-inss-2022", banca: "Cebraspe", ano: "2022", orgao: "INSS", cargo: "Técnico do Seguro Social", nivel: "Médio", file: "inss_2022.json" },
+    { id: "cebraspe-pf-2021", banca: "Cebraspe", ano: "2021", orgao: "Polícia Federal (PF)", cargo: "Agente, Escrivão e Delegado", nivel: "Superior", file: "ALUNO_2_100_questoes_ALUNO.json" },
+    { id: "cebraspe-prf-2021", banca: "Cebraspe", ano: "2021", orgao: "Polícia Rodoviária Federal (PRF)", cargo: "Policial Rodoviário Federal", nivel: "Superior", file: "prf_2021.json" },
+    { id: "cebraspe-tcdf-2020", banca: "Cebraspe", ano: "2020", orgao: "TCDF (Tribunal de Contas)", cargo: "Auditor de Controle Externo", nivel: "Superior", file: "tcdf_2020.json" },
+    { id: "cebraspe-pf-2018", banca: "Cebraspe", ano: "2018", orgao: "Polícia Federal (PF)", cargo: "Agente e Escrivão", nivel: "Superior", file: "pf_2018.json" },
+    { id: "cebraspe-abin-2018", banca: "Cebraspe", ano: "2018", orgao: "ABIN", cargo: "Oficial de Inteligência", nivel: "Superior", file: "abin_2018.json" },
+    { id: "cebraspe-inss-2016", banca: "Cebraspe", ano: "2016", orgao: "INSS", cargo: "Técnico e Analista", nivel: "Médio / Superior", file: "inss_2016.json" },
+
+    // FGV
+    { id: "fgv-dataprev-2026", banca: "FGV", ano: "2026", orgao: "DATAPREV", cargo: "Analista de Tecnologia da Informação", nivel: "Superior", file: "dataprev_2026.json" },
+    { id: "fgv-enam-2025", banca: "FGV", ano: "2025", orgao: "Exame Nacional da Magistratura (ENAM)", cargo: "Juiz Substituto (Habilitação)", nivel: "Superior", file: "enam_2025.json" },
+    { id: "fgv-tjms-2024", banca: "FGV", ano: "2024", orgao: "Tribunal de Justiça de MS (TJ-MS)", cargo: "Analista Judiciário", nivel: "Superior", file: "tjms_2024.json" },
+    { id: "fgv-rfb-2023", banca: "FGV", ano: "2023", orgao: "Receita Federal do Brasil (RFB)", cargo: "Auditor-Fiscal e Analista-Tributário", nivel: "Superior", file: "rfb_2023.json" },
+    { id: "fgv-cgu-2022", banca: "FGV", ano: "2022", orgao: "Controladoria-Geral da União (CGU)", cargo: "Auditor Federal de Finanças", nivel: "Superior", file: "cgu_2022.json" },
+    { id: "fgv-senado-2022", banca: "FGV", ano: "2022", orgao: "Senado Federal", cargo: "Consultor, Analista e Policial", nivel: "Superior", file: "senado_2022.json" },
+    { id: "fgv-tcu-2022", banca: "FGV", ano: "2022", orgao: "Tribunal de Contas da União (TCU)", cargo: "Auditor Federal de Controle Externo", nivel: "Superior", file: "tcu_2022.json" },
+    { id: "fgv-sefazmg-2022", banca: "FGV", ano: "2022", orgao: "SEFAZ-MG", cargo: "Auditor Fiscal da Receita Estadual", nivel: "Superior", file: "1___100_questoes_ALUNO_1.json" },
+    { id: "fgv-tjrj-2021", banca: "FGV", ano: "2021", orgao: "Tribunal de Justiça do RJ (TJRJ)", cargo: "Técnico e Analista Judiciário", nivel: "Médio / Superior", file: "tjrj_2021.json" },
+    { id: "fgv-mpsp-2018", banca: "FGV", ano: "2018", orgao: "Ministério Público de SP (MPSP)", cargo: "Analista Científico", nivel: "Superior", file: "mpsp_2018.json" },
+    { id: "fgv-compesa-2016", banca: "FGV", ano: "2016", orgao: "COMPESA (Pernambuco)", cargo: "Engenheiro e Assistente", nivel: "Médio / Superior", file: "compesa_2016.json" },
+
+    // Cesgranrio
+    { id: "cesgranrio-bndes-2025", banca: "Cesgranrio", ano: "2025", orgao: "BNDES", cargo: "Analista (Especialidades)", nivel: "Superior", file: "bndes_2025.json" },
+    { id: "cesgranrio-cnu-2024", banca: "Cesgranrio", ano: "2024", orgao: "Concurso Nacional Unificado (CNU)", cargo: "Blocos 1 a 8 (Vários Cargos)", nivel: "Médio / Superior", file: "cnu_2024.json" },
+    { id: "cesgranrio-caixa-2024", banca: "Cesgranrio", ano: "2024", orgao: "Caixa Econômica Federal", cargo: "Técnico Bancário Novo", nivel: "Médio", file: "caixa_2024.json" },
+    { id: "cesgranrio-bb-2023", banca: "Cesgranrio", ano: "2023", orgao: "Banco do Brasil (BB)", cargo: "Escriturário (Agente Comercial e T.I.)", nivel: "Médio", file: "bb_2023.json" },
+    { id: "cesgranrio-transpetro-2023", banca: "Cesgranrio", ano: "2023", orgao: "Transpetro", cargo: "Engenheiro, Técnico e Marinha", nivel: "Médio / Superior", file: "transpetro_2023.json" },
+    { id: "cesgranrio-petrobras-2022", banca: "Cesgranrio", ano: "2022", orgao: "Petrobras", cargo: "Técnico de Operações / Manutenção", nivel: "Médio / Técnico", file: "petrobras_2022.json" },
+    { id: "cesgranrio-bb-2021", banca: "Cesgranrio", ano: "2021", orgao: "Banco do Brasil (BB)", cargo: "Escriturário", nivel: "Médio", file: "bb_2021.json" },
+    { id: "cesgranrio-liquigas-2018", banca: "Cesgranrio", ano: "2018", orgao: "LIQUIGÁS", cargo: "Oficial de Produção e Assistente", nivel: "Médio / Superior", file: "liquigas_2018.json" },
+    { id: "cesgranrio-anp-2016", banca: "Cesgranrio", ano: "2016", orgao: "ANP (Agência do Petróleo)", cargo: "Técnico e Especialista", nivel: "Médio / Superior", file: "anp_2016.json" },
+
+    // FCC
+    { id: "fcc-trt15-2025", banca: "FCC", ano: "2025", orgao: "TRT-15 (Campinas/SP)", cargo: "Técnico e Analista Judiciário", nivel: "Superior", file: "trt15_2025.json" },
+    { id: "fcc-trt11-2024", banca: "FCC", ano: "2024", orgao: "TRT-11 (AM/RR)", cargo: "Técnico e Analista Judiciário", nivel: "Superior", file: "trt11_2024.json" },
+    { id: "fcc-tresp-2023", banca: "FCC", ano: "2023", orgao: "TRE-SP", cargo: "Técnico e Analista Judiciário", nivel: "Superior", file: "trt_sp_2023.json" },
+    { id: "fcc-trt4-2022", banca: "FCC", ano: "2022", orgao: "TRT-4 (RS) / TRT-5 / TRT-9", cargo: "Técnico e Analista Judiciário", nivel: "Superior", file: "trt4_2022.json" },
+    { id: "fcc-cldf-2018", banca: "FCC", ano: "2018", orgao: "CLDF (Câmara Legislativa DF)", cargo: "Consultor e Técnico Legislativo", nivel: "Médio / Superior", file: "cldf_2018.json" },
+    { id: "fcc-sabesp-2018", banca: "FCC", ano: "2018", orgao: "Sabesp", cargo: "Técnico, Engenheiro e Assistente", nivel: "Médio / Superior", file: "sabesp_2018.json" },
+    { id: "fcc-tst-2017", banca: "FCC", ano: "2017", orgao: "TST (Tribunal Superior)", cargo: "Técnico e Analista Judiciário", nivel: "Médio / Superior", file: "tst_2017.json" },
+    { id: "fcc-trt20-2016", banca: "FCC", ano: "2016", orgao: "TRT-20 (SE) / TRT-11", cargo: "Técnico e Analista Judiciário", nivel: "Médio / Superior", file: "trt20_2016.json" },
+
+    // Vunesp (Magistratura, Promotor e Delegado)
+    { id: "vunesp-tjsp-juiz-2025", banca: "Vunesp", ano: "2025", orgao: "Tribunal de Justiça de SP (TJ-SP)", cargo: "Juiz Substituto (191º Concurso)", nivel: "Superior", file: "tjsp_juiz_2025.json" },
+    { id: "vunesp-tjsp-juiz-2023", banca: "Vunesp", ano: "2023", orgao: "Tribunal de Justiça de SP (TJ-SP)", cargo: "Juiz Substituto (190º Concurso)", nivel: "Superior", file: "tjsp_juiz_2023.json" },
+    { id: "vunesp-tjsp-juiz-2021", banca: "Vunesp", ano: "2021", orgao: "Tribunal de Justiça de SP (TJ-SP)", cargo: "Juiz Substituto (189º Concurso)", nivel: "Superior", file: "tjsp_juiz_2021.json" },
+    { id: "vunesp-mpsp-promotor-2026", banca: "Vunesp", ano: "2026", orgao: "Ministério Público de SP (MP-SP)", cargo: "Promotor de Justiça Substituto (96º Concurso)", nivel: "Superior", file: "mpsp_promotor_2026.json" },
+    { id: "vunesp-mpsp-promotor-2023", banca: "Vunesp", ano: "2023", orgao: "Ministério Público de SP (MP-SP)", cargo: "Promotor de Justiça Substituto (95º Concurso)", nivel: "Superior", file: "mpsp_promotor_2023.json" },
+    { id: "vunesp-mpsc-promotor-2025", banca: "Vunesp", ano: "2025", orgao: "Ministério Público de SC (MP-SC)", cargo: "Promotor de Justiça Substituto (45º Concurso)", nivel: "Superior", file: "mpsc_promotor_2025.json" },
+    { id: "vunesp-pcsp-delegado-2023", banca: "Vunesp", ano: "2023", orgao: "Polícia Civil de SP (PC-SP)", cargo: "Delegado de Polícia", nivel: "Superior", file: "pcsp_delegado_2023.json" },
+    { id: "vunesp-pcsp-delegado-2022", banca: "Vunesp", ano: "2022", orgao: "Polícia Civil de SP (PC-SP)", cargo: "Delegado de Polícia", nivel: "Superior", file: "pcsp_delegado_2022.json" },
+    { id: "vunesp-pcsp-delegado-2018", banca: "Vunesp", ano: "2018", orgao: "Polícia Civil de SP (PC-SP)", cargo: "Delegado de Polícia", nivel: "Superior", file: "pcsp_delegado_2018.json" }
+];
+
+let emModoSimulado = false;
+let simuladoFinalizado = false;
+
+let opacidadeCanetas = {
+    'yellow': 45,
+    'green': 45,
+    'blue': 45,
+    'pink': 45,
+    'orange': 45
+};
+
+try {
+    const storedOpacidades = localStorage.getItem("remb_opacidades_canetas");
+    if (storedOpacidades) {
+        opacidadeCanetas = { ...opacidadeCanetas, ...JSON.parse(storedOpacidades) };
+    }
+} catch (e) {
+    console.warn("Erro ao ler opacidades das canetas:", e);
+}
+
+// Gerador determinístico de relevância para fins de teste
+function obterRelevanciaQuestao(q) {
+    let hash = 0;
+    const idStr = q.id || '';
+    for (let i = 0; i < idStr.length; i++) {
+        hash = idStr.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const pct = 55 + Math.abs(hash % 41); // Entre 55% e 95%
+    return pct;
+}
 
 // Cores HSL correspondentes às canetas para o estilo de seleção
 const coresSelecaoRGB = {
@@ -192,12 +287,56 @@ document.addEventListener("DOMContentLoaded", () => {
     carregarConfiguracoesLocais();
     autoSemearTags(); // Adicionar tags dinâmicas nas questões
     iniciarCronometro();
+
+    // Ocultar Laboratório se estiver em modo de publicação direcionada Luciana
+    const isLucianaMode = window.location.pathname.includes('/luciana') || window.location.href.includes('luciana');
+    if (isLucianaMode) {
+        const labBtn = document.getElementById("btn-nav-validacao");
+        if (labBtn) labBtn.style.display = "none";
+    }
+    
+    // Rastrear clique em cards para marcar activeQuestionId
+    document.addEventListener("click", (e) => {
+        const card = e.target.closest(".questao-card");
+        if (card) {
+            const match = card.id.match(/(card|foco-card)-(.+)/);
+            if (match) {
+                activeQuestionId = match[2];
+            }
+        }
+    });
+
     inicializarFiltros();
     inicializarTagsInput();
     inicializarArrastoHighlighter();
+    
+    // Restaurar estado de recolhimento da sidebar
+    const collapsed = localStorage.getItem("remb_sidebar_collapsed") === "true";
+    const layout = document.querySelector(".app-layout");
+    const arrow = document.querySelector(".btn-collapse-sidebar .icon-arrow");
+    if (collapsed && layout) {
+        layout.classList.add("sidebar-collapsed");
+        if (arrow) arrow.innerText = "▶";
+    }
+
+    // Carregar configurações de opacidade e hover corretivo
+    const storedOpacity = localStorage.getItem("remb_highlight_opacity") || "45";
+    const slider = document.getElementById("opacitySlider");
+    if (slider) slider.value = storedOpacity;
+    window.alterarOpacidadeGrifos(storedOpacity);
+    
+    // Inicializar slider de opacidade flutuante na barra móvel
+    window.inicializarSliderOpacidadeFlutuante();
+
+    const storedHover = localStorage.getItem("remb_hover_corretivo") !== "false";
+    const toggleHover = document.getElementById("toggleHoverCorretivo");
+    if (toggleHover) toggleHover.checked = storedHover;
+    window.alternarHoverCorretivo(storedHover);
+
     navegarPara('dashboard'); // Abrir no dashboard (barra de canetas oculta inicialmente)
     configurarEventosTecladoFoco();
     configurarMarcadorTexto();
+    window.configurarAtalhosTecladoCaneta();
     aplicarGlowButtons(); // Aplicar micro-animações GSAP nos botões
     if (typeof atualizarContagemCuracaoHeader === 'function') {
         atualizarContagemCuracaoHeader();
@@ -243,8 +382,20 @@ function carregarConfiguracoesLocais() {
                 anotacoes: parsed.anotacoes || {},
                 comentariosForum: parsed.comentariosForum || {},
                 baloesSalvos: parsed.baloesSalvos || {},
-                tagsCustomizadas: parsed.tagsCustomizadas || {}
+                tagsCustomizadas: parsed.tagsCustomizadas || {},
+                curacaoVal: parsed.curacaoVal || {},
+                questoesLaboratorioAdicionais: parsed.questoesLaboratorioAdicionais || [],
+                planner: parsed.planner || { cicloAtivo: false, config: {}, progresso: { totalRealizado: 0, historicoDias: {}, questoesCiclo: [] } }
             };
+
+            // Injetar questões copiadas da sala ao array global do laboratório
+            if (typeof QUESTOES_CESPE_TRATADAS !== 'undefined' && progressoUsuario.questoesLaboratorioAdicionais) {
+                progressoUsuario.questoesLaboratorioAdicionais.forEach(q => {
+                    if (!QUESTOES_CESPE_TRATADAS.some(ext => ext.id === q.id)) {
+                        QUESTOES_CESPE_TRATADAS.unshift(q); // Coloca no topo
+                    }
+                });
+            }
         } catch (e) {
             console.error("Erro ao carregar dados do LocalStorage", e);
         }
@@ -325,6 +476,12 @@ function navegarPara(sectionId) {
         atualizarEstatisticasDashboard();
     } else if (sectionId === 'questoes') {
         aplicarFiltros();
+    } else if (sectionId === 'provas') {
+        window.renderizarBibliotecaProvas();
+    } else if (sectionId === 'estatisticas') {
+        window.renderizarEstatisticasDetalhadas();
+    } else if (sectionId === 'planner') {
+        window.renderizarPlanner();
     } else if (sectionId === 'validacao') {
         inicializarFiltrosVal();
         aplicarFiltrosVal();
@@ -373,6 +530,20 @@ function iniciarCronometro() {
             timerSegundos++;
             atualizarCronometroTela();
             localStorage.setItem("remb_estudos_tempo", timerSegundos);
+
+            // Incrementa o tempo total na Sala de Questões
+            const isNaSala = document.getElementById("section-questoes")?.classList.contains("active");
+            if (isNaSala) {
+                progressoUsuario.tempoTotalSala = (progressoUsuario.tempoTotalSala || 0) + 1;
+            }
+
+            // Incrementa o tempo gasto na questão ativa
+            if (activeQuestionId) {
+                if (!progressoUsuario.temposQuestoes) {
+                    progressoUsuario.temposQuestoes = {};
+                }
+                progressoUsuario.temposQuestoes[activeQuestionId] = (progressoUsuario.temposQuestoes[activeQuestionId] || 0) + 1;
+            }
         }
     }, 1000);
 }
@@ -452,11 +623,29 @@ function aplicarFiltros() {
     const listaOrigem = document.getElementById("filterListaOrigem").value;
     const status = document.getElementById("filterStatus").value;
 
+    // Se o usuário selecionou uma lista manualmente ou trocou a banca para algo incompatível, limpamos a prova ativa
+    if (globalProvaAtiva) {
+        if (listaOrigem !== "todas" || (banca !== "todas" && banca.toLowerCase() !== globalProvaAtiva.banca.toLowerCase())) {
+            globalProvaAtiva = null;
+        }
+    }
+
     const filtradas = BANCO_QUESTOES.filter(q => {
+        if (globalProvaAtiva) {
+            // Filtra exclusivamente pela prova selecionada
+            if (q.origem_importacao?.arquivo !== globalProvaAtiva.file) return false;
+        } else {
+            // Filtros de banca e lista originais
+            if (banca !== "todas") {
+                const qBanca = (q.origem_questao?.banca || "").toLowerCase();
+                const selBanca = banca.toLowerCase();
+                const isCebraspeMatch = (selBanca === "cebraspe" || selBanca === "cespe") && (qBanca === "cebraspe" || qBanca === "cespe");
+                if (!isCebraspeMatch && qBanca !== selBanca) return false;
+            }
+            if (listaOrigem !== "todas" && q.origem_importacao?.arquivo !== listaOrigem) return false;
+        }
         if (disc !== "todas" && q.disciplina !== disc) return false;
         if (assunto !== "todos" && q.assunto !== assunto) return false;
-        if (banca !== "todas" && q.origem_questao?.banca !== banca) return false;
-        if (listaOrigem !== "todas" && q.origem_importacao?.arquivo !== listaOrigem) return false;
         
         const resp = progressoUsuario.respondidas[q.id];
         if (status === "nao_respondidas" && resp) return false;
@@ -483,6 +672,13 @@ function aplicarFiltros() {
                        (q.origem_questao?.banca || "").toLowerCase().includes(tagLower);
             });
             if (!atendeTodasAsTags) return false;
+        }
+
+        // Filtro de Relevância (Assuntos mais cobrados)
+        const toggleRelevancia = document.getElementById("toggleAssuntosCobrados");
+        if (toggleRelevancia && toggleRelevancia.checked) {
+            const rel = obterRelevanciaQuestao(q);
+            if (rel < 80) return false;
         }
 
         return true;
@@ -560,6 +756,64 @@ function renderizarListaQuestoes(lista, container, isFoco = false, key = "sala")
     }
 }
 
+
+function isCodeBlockContext(text) {
+    if (!text) return false;
+    const trimmed = text.trim();
+    return /^0\d\s+/.test(trimmed) || trimmed.startsWith('pipeline {') || trimmed.includes('agent any');
+}
+
+
+function obterAbstractStepsDefault(q) {
+    const isCebraspe = q.origem_questao?.banca?.toLowerCase() === 'cebraspe' || q.origem_questao?.banca?.toLowerCase() === 'cespe';
+    const gabarito = q.gabarito || (isCebraspe ? "C" : "A");
+    
+    if (isCebraspe) {
+        return [
+            {
+                titulo: "Foco da Questão",
+                texto: `Esta questão aborda ${q.disciplina || "a matéria"} no tema ${q.assunto || "Geral"}.`,
+                target: "header",
+                cor_destaque: "none"
+            },
+            {
+                titulo: "Análise do Enunciado",
+                texto: "Analise atentamente as afirmações contidas no enunciado para julgar o item.",
+                target: "enunciado",
+                cor_destaque: "none"
+            },
+            {
+                titulo: "Gabarito Oficial",
+                texto: `O gabarito oficial da banca é ${gabarito === 'C' ? 'Certo' : 'Errado'}.`,
+                target: "gabarito",
+                cor_destaque: "none"
+            }
+        ];
+    } else {
+        const incorretas = ["A", "B", "C", "D", "E"].filter(l => l !== gabarito).slice(0, 2);
+        return [
+            {
+                titulo: "Classificação",
+                texto: `Esta questão aborda ${q.disciplina || "a matéria"} no tema ${q.assunto || "Geral"}.`,
+                target: "header",
+                cor_destaque: "none"
+            },
+            {
+                titulo: "Eliminação",
+                texto: `A alternativa (${incorretas[0]}) pode ser eliminada.`,
+                target: incorretas[0],
+                cor_destaque: "tachar"
+            },
+            {
+                titulo: "Gabarito",
+                texto: `A alternativa correta é a (${gabarito}).`,
+                target: "gabarito",
+                cor_destaque: "none"
+            }
+        ];
+    }
+}
+
 // ==========================================================================
 // CONSTRUÇÃO E LÓGICA DO CARD DE QUESTÃO (INCLUI X TAXATIVO E TAGS DO USUÁRIO)
 // ==========================================================================
@@ -577,7 +831,8 @@ function criarQuestaoCard(q, isModoFoco = false) {
             enunciado: curado.enunciado !== undefined ? curado.enunciado : q.enunciado,
             gabarito: curado.gabarito !== undefined ? curado.gabarito : q.gabarito,
             disciplina: curado.disciplina !== undefined ? curado.disciplina : q.disciplina,
-            assunto: curado.assunto !== undefined ? curado.assunto : q.assunto
+            assunto: curado.assunto !== undefined ? curado.assunto : q.assunto,
+            passos_correcao: curado.passos_correcao !== undefined ? curado.passos_correcao : q.passos_correcao
         };
         if (curado.banca !== undefined) {
             q.origem_questao = { ...q.origem_questao, banca: curado.banca };
@@ -593,9 +848,19 @@ function criarQuestaoCard(q, isModoFoco = false) {
     }
 
     if (questaoEmEdicaoId === q.id) {
+        const temProvaIdentificada = !!(q.prova_id || q.prova_nome || q.prova_vinculada);
+        const infoProvaHTML = temProvaIdentificada ? `
+            <div style="font-size:0.75rem; color:var(--accent); font-weight:700; margin-top:2px;">
+                📋 Prova Vinculada: ${q.prova_nome || q.prova_id || q.prova_vinculada}
+            </div>
+        ` : "";
+
+        const disableBancaAttr = temProvaIdentificada ? "readonly style='width:100%; padding:8px; border-radius:8px; border:1px solid var(--border); background-color:var(--border); color:var(--text-secondary); cursor:not-allowed; opacity:0.85;' title='Banca vinculada à Prova (Não editável)'" : "style='width:100%; padding:8px; border-radius:8px; border:1px solid var(--border); background-color:var(--bg-app); color:var(--text-primary);'";
+
         card.innerHTML = `
-            <div class="questao-header">
+            <div class="questao-header" style="display:flex; flex-direction:column; align-items:flex-start;">
                 <h2>Editar Questão ${q.labId}</h2>
+                ${infoProvaHTML}
             </div>
             <div style="padding: 15px; display: flex; flex-direction: column; gap: 12px;">
                 <div>
@@ -613,7 +878,7 @@ function criarQuestaoCard(q, isModoFoco = false) {
                     </div>
                     <div style="flex:1; min-width:120px;">
                         <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:4px; color:var(--text-secondary);">Banca:</label>
-                        <input type="text" id="edit-banca-${q.id}" value="${q.origem_questao?.banca || 'CESPE'}" placeholder="Ex: CESPE" style="width:100%; padding:8px; border-radius:8px; border:1px solid var(--border); background-color:var(--bg-app); color:var(--text-primary);">
+                        <input type="text" id="edit-banca-${q.id}" value="${q.origem_questao?.banca || 'CESPE'}" placeholder="Ex: CESPE" ${disableBancaAttr}>
                     </div>
                     <div style="flex:1; min-width:150px;">
                         <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:4px; color:var(--text-secondary);">Disciplina:</label>
@@ -624,8 +889,16 @@ function criarQuestaoCard(q, isModoFoco = false) {
                         <input type="text" id="edit-assunto-${q.id}" value="${q.assunto || ''}" placeholder="Ex: Atos Administrativos" style="width:100%; padding:8px; border-radius:8px; border:1px solid var(--border); background-color:var(--bg-app); color:var(--text-primary);">
                     </div>
                 </div>
+                <div style="margin-top:15px; border-top:1.5px solid var(--border); padding-top:15px; text-align: left;">
+                    <h3 style="font-size:0.95rem; font-weight:800; color:var(--text-primary); margin-bottom:12px;">🛠️ Fluxo da Correção Interativa (Passos)</h3>
+                    <div id="visual-steps-container-${q.id}" style="display:flex; flex-direction:column; gap:12px; margin-bottom:15px;"></div>
+                    <button class="btn btn-outline-primary btn-sm" onclick="window.adicionarPassoVisual('${q.id}')" style="font-weight:700; border-radius:6px; font-size:0.75rem; padding:6px 12px; cursor:pointer;">
+                        ➕ Adicionar Novo Passo
+                    </button>
+                </div>
                 <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:10px;">
                     <button class="btn-pag" onclick="cancelarEdicaoQuestao('${q.id}')">Cancelar</button>
+                    <button class="btn-pag" onclick="window.gerarPreviewCorrecao('${q.id}')" style="background-color:var(--correta); color:#fff; border-color:var(--correta);">🧪 Gerar Preview</button>
                     <button class="btn-pag" onclick="salvarEdicaoQuestao('${q.id}')" style="background-color:var(--accent); color:#fff; border-color:var(--accent);">Salvar</button>
                 </div>
             </div>
@@ -633,7 +906,11 @@ function criarQuestaoCard(q, isModoFoco = false) {
         return card;
     }
 
-    const respondida = progressoUsuario.respondidas[q.id];
+    let respondida = progressoUsuario.respondidas[q.id];
+    const isPreviewMode = (window.emPreviewCuracaoId === q.id);
+    if (isPreviewMode) {
+        respondida = respondida || { selecionada: q.gabarito || "C", correta: true };
+    }
     const isFavorita = progressoUsuario.favoritas.includes(q.id);
     const alternativasRiscadas = progressoUsuario.riscadas[q.id] || [];
 
@@ -678,30 +955,72 @@ function criarQuestaoCard(q, isModoFoco = false) {
         aprovadaBadgeHTML = `<span class="meta-badge" style="background-color: var(--correta-light); color: var(--correta); font-weight: 700; border: 1px solid var(--correta);">✓ Consistente</span>`;
     }
 
-    let metaHTML = `
-        <div class="questao-meta">
-            <span class="meta-badge banca">${q.origem_questao?.banca || "FGV"}</span>
-            ${q.disciplina ? `<span class="meta-badge">${q.disciplina}</span>` : ""}
-            ${q.assunto ? `<span class="meta-badge">${q.assunto}</span>` : ""}
-            ${labBadgeHTML}
-            ${aprovadaBadgeHTML}
-            ${respondida ? `<span class="meta-badge ${respondida.correta ? 'banca' : 'errada'}">${respondida.correta ? '🟢 Correta' : '🔴 Errada'}</span>` : ""}
-        </div>
-        ${tagsHTML}
-    `;
+    let metaHTML = "";
+    const relevanc = obterRelevanciaQuestao(q);
+    const fireBadge = relevanc >= 80 ? `<span class="meta-badge" style="background-color:#fffbeb; color:#d97706; border:1px solid #fde68a; font-weight:700;">🔥 Relevância: ${relevanc}%</span>` : '';
+    const emSimuladoOculto = emModoSimulado && !simuladoFinalizado;
 
-    // Botões de favoritos
-    let headerActionsHTML = `
-        <div class="card-header-actions">
-            <button class="btn-favoritar" onclick="toggleFavorito('${q.id}')" title="Favoritar questão">
-                ${isFavorita ? "⭐" : "☆"}
+    const idBadgeHTML = `<span class="meta-badge" style="background-color: var(--border); color: var(--text-secondary); font-family: monospace; font-size: 0.68rem; font-weight: 700; border: none; letter-spacing: 0.2px;">ID: ${q.id}</span>`;
+    if (emSimuladoOculto) {
+        metaHTML = `
+            <div class="questao-meta">
+                ${idBadgeHTML}
+                <span class="meta-badge" style="background-color: var(--accent-light); color: var(--accent); font-weight: 700; border: none;">📝 Modo Simulado Ativo</span>
+                ${respondida ? `<span class="meta-badge" style="background-color: var(--border); color: var(--text-secondary); font-weight: 700; border: none;">Respondida</span>` : ""}
+            </div>
+        `;
+    } else {
+        metaHTML = `
+            <div class="questao-meta">
+                ${idBadgeHTML}
+                <span class="meta-badge banca">${q.origem_questao?.banca || "FGV"}</span>
+                ${q.disciplina ? `<span class="meta-badge">${q.disciplina}</span>` : ""}
+                ${q.assunto ? `<span class="meta-badge">${q.assunto}</span>` : ""}
+                ${labBadgeHTML}
+                ${aprovadaBadgeHTML}
+                ${fireBadge}
+                ${respondida ? `<span class="meta-badge ${respondida.correta ? 'banca' : 'errada'}">${respondida.correta ? '🟢 Correta' : '🔴 Errada'}</span>` : ""}
+            </div>
+            ${tagsHTML}
+        `;
+    }
+
+    // Botões de favoritos e curação
+    let headerActionsHTML = "";
+    if (!emSimuladoOculto) {
+        const isLucianaMode = window.location.pathname.includes('/luciana') || window.location.href.includes('luciana');
+        const labBtnHTML = (!q.labId && !isLucianaMode) ? `
+            <button class="btn btn-outline-secondary btn-sm" onclick="enviarParaLaboratorio('${q.id}')" title="Enviar cópia para curação no Laboratório" style="border-radius:6px; font-size:0.72rem; padding:3px 8px; font-weight:700; border:1.5px solid var(--border); background:transparent; color:var(--text-secondary); cursor:pointer;">
+                🧪 Enviar ao Lab
             </button>
-        </div>
-    `;
+        ` : "";
+        headerActionsHTML = `
+            <div class="card-header-actions" style="display:flex; align-items:center; gap:8px;">
+                ${labBtnHTML}
+                <button class="btn-favoritar" onclick="toggleFavorito('${q.id}')" title="Favoritar questão">
+                    ${isFavorita ? "⭐" : "☆"}
+                </button>
+            </div>
+        `;
+    }
 
     // Cabeçalho
+    let previewToolbarHTML = "";
+    if (isPreviewMode) {
+        previewToolbarHTML = `
+            <div class="preview-curacao-toolbar" style="width:100%; border:1.5px solid var(--correta); background-color:var(--correta-light); color:var(--correta); margin-bottom:15px; display:flex; justify-content:space-between; align-items:center; padding:10px 15px; border-radius:10px;">
+                <div style="font-weight:800; display:flex; align-items:center; gap:6px; font-size:0.85rem;">🧪 Preview da Correção Interativa</div>
+                <div style="display:flex; gap:8px;">
+                    <button class="btn btn-sm btn-light" onclick="window.voltarAoEditor('${q.id}')" style="font-weight:700; border-radius:6px; font-size:0.75rem; padding:4px 8px;">Voltar ao Editor</button>
+                    <button class="btn btn-sm btn-primary" onclick="window.salvarEdicaoQuestao('${q.id}')" style="font-weight:750; border-radius:6px; background-color:var(--accent); border-color:var(--accent); font-size:0.75rem; padding:4px 8px; color:#fff;">Salvar e Concluir</button>
+                </div>
+            </div>
+        `;
+    }
+
     const titleText = q.labId ? `Identificação: ${q.labId}` : `Questão ${q.numero}`;
     const headerHTML = `
+        ${previewToolbarHTML}
         <div class="questao-header">
             <h2>${titleText}</h2>
         </div>
@@ -709,7 +1028,7 @@ function criarQuestaoCard(q, isModoFoco = false) {
 
     // Enunciado
     let enunciadoTexto = q.enunciado;
-    if (q.conectores) {
+    if (q.conectores && !emSimuladoOculto) {
         q.conectores.forEach((c, idx) => {
             const escapedWord = c.origem_word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             const regex = new RegExp(`(${escapedWord})`, 'gi');
@@ -717,13 +1036,42 @@ function criarQuestaoCard(q, isModoFoco = false) {
         });
     }
 
+    let contextoHTML = "";
+    if (q.contexto) {
+        const isCode = isCodeBlockContext(q.contexto);
+        const fontStyle = isCode 
+            ? "font-family: Consolas, 'Courier New', Courier, monospace; font-size: 0.85rem; background-color: #1e1e1e; color: #d4d4d4; padding: 14px; border-radius: 8px; border-left: 4px solid #007acc; overflow-x: auto; white-space: pre; text-align: left;" 
+            : "font-family: inherit; font-size: 0.92rem; background-color: var(--bg-app); color: var(--text-secondary); padding: 12px 16px; border-radius: 6px; border-left: 4px solid var(--accent); line-height: 1.5; white-space: pre-wrap; text-align: left;";
+        
+        const labelStyle = isCode
+            ? "font-weight: 700; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; color: #007acc; margin-bottom: 8px; user-select: none;"
+            : "font-weight: 700; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--accent); margin-bottom: 8px; user-select: none;";
+
+        contextoHTML = `
+            <div class="questao-contexto" style="margin: 12px 0;">
+                <div style="${labelStyle}">Contexto / Texto Associado</div>
+                <div style="${fontStyle}">${q.contexto}</div>
+            </div>
+        `;
+    }
+
+    let comandoHTML = "";
+    if (q.comando) {
+        comandoHTML = `
+            <div class="questao-comando" style="margin: 10px 0 14px 0; font-size: 0.95rem; font-weight: 700; color: var(--text-primary); line-height: 1.4; border-bottom: 1.5px dashed var(--border); padding-bottom: 8px; text-align: left;">
+                <span style="font-weight: 800; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); display: block; margin-bottom: 4px; user-select: none;">Instrução / Comando</span>
+                ${q.comando}
+            </div>
+        `;
+    }
+
     const enunciadoHTML = `
-        <div class="enunciado-texto">${enunciadoTexto}</div>
+        <div class="enunciado-texto" style="text-align: left;">${enunciadoTexto}</div>
     `;
 
     // Alternativas
     let alternativasHTML = `<div class="alternativas-container" style="position:relative;">`;
-    if (q.conectores) {
+    if (q.conectores && !emSimuladoOculto) {
         alternativasHTML += `<svg class="keyword-connector-overlay" id="connector-svg-${q.id}"></svg>`;
     }
 
@@ -732,16 +1080,20 @@ function criarQuestaoCard(q, isModoFoco = false) {
         const isTachada = alternativasRiscadas.includes(alt.letra);
         if (isTachada) classes += " tachada";
         
-        if (respondida) {
+        if (respondida && !emSimuladoOculto) {
             if (alt.letra === q.gabarito) {
                 classes += " correta";
             } else if (respondida.selecionada === alt.letra) {
                 classes += " incorreta";
             }
+        } else if (respondida && emSimuladoOculto) {
+            if (respondida.selecionada === alt.letra) {
+                classes += " selecionada";
+            }
         }
 
         let textoAlternativa = alt.texto;
-        if (respondida && q.termos_incorretos_alternativas) {
+        if (respondida && q.termos_incorretos_alternativas && !emSimuladoOculto) {
             const regrasTachar = q.termos_incorretos_alternativas.filter(r => r.letra === alt.letra);
             regrasTachar.forEach(regra => {
                 const escapedTerm = regra.termo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -750,7 +1102,7 @@ function criarQuestaoCard(q, isModoFoco = false) {
             });
         }
 
-        if (q.conectores) {
+        if (q.conectores && !emSimuladoOculto) {
             q.conectores.forEach((c, idx) => {
                 if (c.destino_letra === alt.letra) {
                     const escapedDest = c.destino_word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -760,9 +1112,30 @@ function criarQuestaoCard(q, isModoFoco = false) {
             });
         }
 
+        let letterContent = alt.letra;
+        if (q.tipo === 'certo_errado') {
+            if (respondida && !emSimuladoOculto) {
+                if (alt.letra === q.gabarito) {
+                    letterContent = '✓';
+                } else if (respondida.selecionada === alt.letra) {
+                    letterContent = '✗';
+                } else {
+                    letterContent = '&nbsp;';
+                }
+            } else if (respondida && emSimuladoOculto) {
+                if (respondida.selecionada === alt.letra) {
+                    letterContent = '●';
+                } else {
+                    letterContent = '&nbsp;';
+                }
+            } else {
+                letterContent = '&nbsp;';
+            }
+        }
+
         alternativasHTML += `
             <div class="${classes}" data-letra="${alt.letra}">
-                <div class="alternativa-letter">${alt.letra}</div>
+                <div class="alternativa-letter" style="${q.tipo === 'certo_errado' ? 'font-size:1.1rem; font-weight:800;' : ''}">${letterContent}</div>
                 <div class="alternativa-texto">${textoAlternativa}</div>
                 ${!respondida ? `
                     <button class="btn-eliminar" onclick="riscarAlternativa(event, '${q.id}', '${alt.letra}')" title="x taxativo">
@@ -790,27 +1163,37 @@ function criarQuestaoCard(q, isModoFoco = false) {
             </div>
         `;
     } else {
-        footerHTML = `
-            <div class="questao-footer" style="border: none; padding-top: 0;">
-                ${!isModoFoco ? `
-                    <button class="btn-secundario" onclick="entrarModoFoco('${q.id}')">
-                        🔍 Modo Foco
-                    </button>
-                ` : '<div></div>'}
-                <div style="display:flex; gap: 10px; align-items:center;">
-                    <button class="btn btn-outline-primary btn-sm" onclick="iniciarCorrecaoPedagogica('${q.id}')" style="border-radius:8px; font-weight:600;">
-                        🎓 Correção Interativa
-                    </button>
-                    <span class="meta-badge" style="background-color: var(--accent-light); color: var(--accent); font-weight: 700; border: none; padding: 8px 16px;">
-                        Resolução Concluída
+        if (emSimuladoOculto) {
+            footerHTML = `
+                <div class="questao-footer" style="border: none; padding-top: 0;">
+                    <span class="meta-badge" style="background-color: var(--border); color: var(--text-secondary); font-weight: 700; padding: 8px 16px;">
+                        Questão Respondida (Modo Simulado)
                     </span>
                 </div>
-            </div>
-        `;
+            `;
+        } else {
+            footerHTML = `
+                <div class="questao-footer" style="border: none; padding-top: 0;">
+                    ${!isModoFoco ? `
+                        <button class="btn-secundario" onclick="entrarModoFoco('${q.id}')">
+                            🔍 Modo Foco
+                        </button>
+                    ` : '<div></div>'}
+                    <div style="display:flex; gap: 10px; align-items:center;">
+                        <button class="btn btn-outline-primary btn-sm" onclick="iniciarCorrecaoPedagogica('${q.id}')" style="border-radius:8px; font-weight:600;">
+                            🎓 Correção Interativa
+                        </button>
+                        <span class="meta-badge" style="background-color: var(--accent-light); color: var(--accent); font-weight: 700; border: none; padding: 8px 16px;">
+                            Resolução Concluída
+                        </span>
+                    </div>
+                </div>
+            `;
+        }
     }
 
     let posResolucaoHTML = "";
-    if (respondida) {
+    if (respondida && !emSimuladoOculto) {
         posResolucaoHTML = criarBlocoPosResolucao(q);
     }
 
@@ -828,7 +1211,7 @@ function criarQuestaoCard(q, isModoFoco = false) {
         `;
     }
 
-    card.innerHTML = metaHTML + headerActionsHTML + headerHTML + enunciadoHTML + alternativasHTML + footerHTML + posResolucaoHTML + curacaoFooterHTML;
+    card.innerHTML = metaHTML + headerActionsHTML + headerHTML + contextoHTML + comandoHTML + enunciadoHTML + alternativasHTML + footerHTML + posResolucaoHTML + curacaoFooterHTML;
 
     // Vincular eventos de clique e animações 3D às alternativas (GSAP)
     const items = card.querySelectorAll(".alternativa-item");
@@ -1047,10 +1430,45 @@ function responderQuestao(questionId) {
         gsap.to(btnResp, { scale: 0.9, duration: 0.1, yoyo: true, repeat: 1 });
     }
 
+    const tempoGasto = (progressoUsuario.temposQuestoes && progressoUsuario.temposQuestoes[questionId]) || 0;
     progressoUsuario.respondidas[questionId] = {
         selecionada: letraSelecionada,
-        correta: correta
+        correta: correta,
+        tempoGasto: tempoGasto
     };
+
+    // Registrar progresso no Planner se houver um ciclo ativo
+    if (progressoUsuario.planner && progressoUsuario.planner.cicloAtivo) {
+        const p = progressoUsuario.planner;
+        if (!p.progresso.questoesCiclo) p.progresso.questoesCiclo = [];
+        
+        if (!p.progresso.questoesCiclo.includes(questionId)) {
+            p.progresso.questoesCiclo.push(questionId);
+            
+            // Se o objetivo do ciclo for resolver questões, incrementa a realização geral
+            if (p.config.objetivo === "questoes") {
+                p.progresso.totalRealizado = (p.progresso.totalRealizado || 0) + 1;
+            }
+            
+            // Incrementar progresso do dia atual se a matéria coincidir
+            const hojeKey = new Date().toISOString().split('T')[0];
+            if (!p.progresso.historicoDias) p.progresso.historicoDias = {};
+            if (!p.progresso.historicoDias[hojeKey]) {
+                p.progresso.historicoDias[hojeKey] = { planejado: 0, realizado: 0, concluido: false, materia: "" };
+            }
+            
+            const diaMeta = p.progresso.historicoDias[hojeKey];
+            // Se a matéria coincidir com a matéria da meta do dia (ou se não houver matéria definida para o dia)
+            if (diaMeta && (!diaMeta.materia || diaMeta.materia === qObj.disciplina)) {
+                if (p.config.objetivo === "questoes") {
+                    diaMeta.realizado = (diaMeta.realizado || 0) + 1;
+                    if (diaMeta.realizado >= diaMeta.planejado) {
+                        diaMeta.concluido = true;
+                    }
+                }
+            }
+        }
+    }
 
     salvarProgressoLocal();
 
@@ -1631,10 +2049,30 @@ function configurarEventosTecladoFoco() {
 function setCanetaAtiva(cor, btn) {
     const buttons = document.querySelectorAll(".sticky-highlighter-bar button");
     
+    // Se há um texto selecionado no navegador, aplicamos o destaque imediatamente
+    const selection = window.getSelection();
+    const textoSelecionado = selection ? selection.toString().trim() : "";
+    
+    if (textoSelecionado.length > 0) {
+        const range = selection.getRangeAt(0);
+        const parentCard = range.commonAncestorContainer.parentElement.closest(".questao-card");
+        if (parentCard) {
+            if (cor === 'eraser') {
+                limparDestaquesSelecao(range);
+                activeHighlightSpan = null;
+                justHighlighted = true;
+            } else {
+                aplicarDestaque(cor, range);
+            }
+            selection.removeAllRanges();
+        }
+    }
+
     if (canetaAtiva === cor) {
         canetaAtiva = null;
         btn.classList.remove("active");
         atualizarSelecaoCSS(null);
+        atualizarDicaSemantica(null);
         return;
     }
 
@@ -1643,6 +2081,47 @@ function setCanetaAtiva(cor, btn) {
     btn.classList.add("active");
 
     atualizarSelecaoCSS(cor);
+    atualizarDicaSemantica(cor);
+
+    // Carregar a opacidade memorizada para esta caneta específica
+    if (cor !== 'eraser') {
+        const savedOpacity = opacidadeCanetas[cor] || 45;
+        window.alterarOpacidadeGrifos(savedOpacity);
+    }
+}
+
+function atualizarDicaSemantica(cor) {
+    const tipEl = document.getElementById("highlighterSemanticTip");
+    if (!tipEl) return;
+    switch (cor) {
+        case 'yellow':
+            tipEl.innerText = "Palavra-chave / Exceção";
+            tipEl.style.color = "var(--accent)";
+            break;
+        case 'green':
+            tipEl.innerText = "Comando de Ação";
+            tipEl.style.color = "#10b981";
+            break;
+        case 'blue':
+            tipEl.innerText = "Normas e Leis";
+            tipEl.style.color = "#3b82f6";
+            break;
+        case 'pink':
+            tipEl.innerText = "Prazos / Datas";
+            tipEl.style.color = "#ec4899";
+            break;
+        case 'orange':
+            tipEl.innerText = "Situação Fática";
+            tipEl.style.color = "#f97316";
+            break;
+        case 'eraser':
+            tipEl.innerText = "Borracha";
+            tipEl.style.color = "var(--text-secondary)";
+            break;
+        default:
+            tipEl.innerText = "Selecione uma Caneta";
+            tipEl.style.color = "var(--text-secondary)";
+    }
 }
 
 // Injeta folhas de estilos de seleção dinâmica
@@ -1701,6 +2180,54 @@ function inicializarArrastoHighlighter() {
     }
 }
 
+let activeHighlightSpan = null;
+
+function obterRGBACorCaneta(cor, opacityPercent) {
+    const op = opacityPercent / 100;
+    switch (cor) {
+        case 'blue': return `rgba(59, 130, 246, ${op})`;
+        case 'green': return `rgba(16, 185, 129, ${op})`;
+        case 'pink': return `rgba(236, 72, 153, ${op})`;
+        case 'orange': return `rgba(249, 115, 22, ${op})`;
+        case 'yellow':
+        default: return `rgba(234, 179, 8, ${op})`;
+    }
+}
+
+let justHighlighted = false;
+
+// Desmarca a marcação ativa atual e desativa a caneta ativa ao clicar fora (sem selecionar texto)
+document.addEventListener("mouseup", (e) => {
+    if (e.target.closest("#verticalOpacitySliderContainer") || e.target.closest("#opacitySlider") || e.target.closest("#stickyHighlighterBar")) {
+        return;
+    }
+    
+    // Se acabamos de grifar um texto neste mouseup, não cancelamos a caneta
+    if (justHighlighted) {
+        justHighlighted = false;
+        return;
+    }
+    
+    const selection = window.getSelection();
+    const textoSelecionado = selection ? selection.toString().trim() : "";
+    
+    // Se foi apenas um clique limpo fora da barra (sem arrastar/selecionar texto)
+    if (textoSelecionado.length === 0) {
+        // Concluir e fixar a marcação ativa atual
+        activeHighlightSpan = null;
+        
+        // Desativar a caneta/marca-texto ativo se houver
+        if (typeof canetaAtiva !== 'undefined' && canetaAtiva !== null) {
+            canetaAtiva = null;
+            const buttons = document.querySelectorAll(".sticky-highlighter-bar button");
+            buttons.forEach(b => b.classList.remove("active"));
+            if (typeof atualizarSelecaoCSS === 'function') {
+                atualizarSelecaoCSS(null);
+            }
+        }
+    }
+});
+
 function configurarMarcadorTexto() {
     document.addEventListener("mouseup", (e) => {
         if (e.target.closest(".sticky-highlighter-bar") || e.target.closest(".balao-explicativo-popup") || e.target.closest(".btn-sair-correcao-flutuante")) return;
@@ -1715,6 +2242,8 @@ function configurarMarcadorTexto() {
             if (parentCard) {
                 if (canetaAtiva === 'eraser') {
                     limparDestaquesSelecao(range);
+                    activeHighlightSpan = null;
+                    justHighlighted = true;
                 } else {
                     aplicarDestaque(canetaAtiva, range);
                 }
@@ -1728,6 +2257,15 @@ function aplicarDestaque(cor, range) {
     const span = document.createElement("span");
     span.className = `highlight-${cor}`;
     
+    // Pegar a opacidade atual das configurações
+    const storedOpacity = localStorage.getItem("remb_highlight_opacity") || "45";
+    const opacityVal = parseInt(storedOpacity);
+    
+    // Aplicar a cor inline como !important para sobressair ao CSS de classe padrão
+    span.style.setProperty("background-color", obterRGBACorCaneta(cor, opacityVal), "important");
+    span.setAttribute("data-color", cor);
+    span.setAttribute("data-opacity", opacityVal);
+    
     try {
         range.surroundContents(span);
     } catch (e) {
@@ -1736,6 +2274,10 @@ function aplicarDestaque(cor, range) {
         span.appendChild(docFragment);
         range.insertNode(span);
     }
+    
+    // Armazenar referência ativa para permitir ajustes de opacidade antes de desmarcar
+    activeHighlightSpan = span;
+    justHighlighted = true;
 }
 
 function limparDestaquesSelecao(range) {
@@ -1901,6 +2443,38 @@ function fecharModoCorrecao() {
 }
 
 function obterPassosPedagogicosGerais(q) {
+    const passos = q.passos_correcao || obterAbstractStepsDefault(q);
+    const useRigidoOriginal = !q.passos_correcao && (q.id === "Q_1___100_questoes_ALUNO_2" || q.id === "Q_1___100_questoes_ALUNO_3" || q.id === "Q_2___100_questoes_ALUNO_1" || q.numero === 1);
+    
+    if (!useRigidoOriginal) {
+        return passos.map(step => {
+            let targetSelector = `#card-${q.id} .enunciado-texto, #foco-card-${q.id} .enunciado-texto`;
+            if (step.target === 'header') {
+                targetSelector = `#card-${q.id} .questao-header, #foco-card-${q.id} .questao-header`;
+            } else if (step.target === 'gabarito') {
+                targetSelector = `#card-${q.id} [data-letra="${q.gabarito || 'A'}"], #foco-card-${q.id} [data-letra="${q.gabarito || 'A'}"]`;
+            } else if (['A', 'B', 'C', 'D', 'E'].includes(step.target)) {
+                targetSelector = `#card-${q.id} [data-letra="${step.target}"], #foco-card-${q.id} [data-letra="${step.target}"]`;
+            }
+            
+            return {
+                titulo: step.titulo,
+                texto: step.texto,
+                targetSelector: targetSelector,
+                pos: "seta-baixo",
+                action: () => {
+                    if (step.cor_destaque && step.cor_destaque !== 'none' && step.termo_destaque) {
+                        destacarTermoEnunciado(q.id, step.termo_destaque, step.cor_destaque);
+                    } else if (step.target === 'gabarito') {
+                        destacarGabaritoCorreto(q.id, q.gabarito || 'A');
+                    } else if (['A', 'B', 'C', 'D', 'E'].includes(step.target) && step.cor_destaque === 'tachar') {
+                        forcarRiscadoAlternativa(q.id, step.target);
+                    }
+                }
+            };
+        });
+    }
+
     if (q.id === "Q_1___100_questoes_ALUNO_2") {
         return [
             {
@@ -2078,6 +2652,148 @@ function mostrarPassoBalao() {
     card.appendChild(popup);
     popup.style.display = "block";
 
+    // MODO PREVIEW DA CURAÇÃO INTERATIVA
+    const isPreview = (window.emPreviewCuracaoId !== undefined && window.emPreviewCuracaoId !== null);
+    if (isPreview) {
+        conteudo.setAttribute("contenteditable", "true");
+        conteudo.style.outline = "none";
+        conteudo.style.border = "1.5px dashed var(--accent)";
+        conteudo.style.borderRadius = "8px";
+        conteudo.style.padding = "6px";
+        conteudo.style.cursor = "text";
+        conteudo.style.minHeight = "40px";
+        conteudo.title = "Clique e digite para editar este texto diretamente";
+        
+        conteudo.onblur = () => {
+            let cleanText = conteudo.innerHTML;
+            // Remover a marcação do título do passo para salvar apenas a descrição
+            const titleMatch = cleanText.match(/<strong>(.*?)<\/strong><br>/i);
+            if (titleMatch) {
+                cleanText = cleanText.substring(titleMatch[0].length);
+            }
+            // Decodificar entidades e remover tags extras inseridas pelo contenteditable
+            cleanText = cleanText.replace(/&nbsp;/g, ' ').trim();
+            passo.texto = cleanText;
+            const qId = window.emPreviewCuracaoId;
+            const savedSteps = progressoUsuario.curacaoVal[qId]?.passos_correcao;
+            if (savedSteps && savedSteps[activePedagogicalStepIdx]) {
+                savedSteps[activePedagogicalStepIdx].texto = cleanText;
+            }
+        };
+
+        // Drag Bar para Reposicionar
+        let dragBar = document.getElementById("balao-drag-bar");
+        if (!dragBar) {
+            dragBar = document.createElement("div");
+            dragBar.id = "balao-drag-bar";
+            dragBar.style = "background-color: var(--border); font-size: 0.6rem; text-align: center; color: var(--text-secondary); padding: 4px; border-bottom: 1.5px solid var(--border); font-weight: 850; cursor: move; user-select: none; border-top-left-radius: 18px; border-top-right-radius: 18px;";
+            dragBar.innerText = "✥ ARRASTE PARA REPOSICIONAR";
+            popup.prepend(dragBar);
+        }
+        dragBar.style.display = "block";
+
+        let isDragging = false;
+        let startX = 0, startY = 0;
+        let startLeft = 0, startTop = 0;
+
+        dragBar.onmousedown = function(e) {
+            isDragging = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            startLeft = parseFloat(popup.style.left) || 0;
+            startTop = parseFloat(popup.style.top) || 0;
+            document.body.style.cursor = "move";
+            e.preventDefault();
+        };
+
+        const onMouseMove = (e) => {
+            if (!isDragging) return;
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+            const newLeft = startLeft + dx;
+            const newTop = startTop + dy;
+
+            popup.style.left = `${newLeft}px`;
+            popup.style.top = `${newTop}px`;
+            popup.style.transform = "none";
+
+            // Guardar no passo
+            passo.customLeft = `${newLeft}px`;
+            passo.customTop = `${newTop}px`;
+            
+            const qId = window.emPreviewCuracaoId;
+            const savedSteps = progressoUsuario.curacaoVal[qId]?.passos_correcao;
+            if (savedSteps && savedSteps[activePedagogicalStepIdx]) {
+                savedSteps[activePedagogicalStepIdx].customLeft = `${newLeft}px`;
+                savedSteps[activePedagogicalStepIdx].customTop = `${newTop}px`;
+            }
+        };
+
+        const onMouseUp = () => {
+            if (isDragging) {
+                isDragging = false;
+                document.body.style.cursor = "";
+            }
+        };
+
+        document.removeEventListener("mousemove", window.currentBalaoDragMove);
+        document.removeEventListener("mouseup", window.currentBalaoDragUp);
+
+        window.currentBalaoDragMove = onMouseMove;
+        window.currentBalaoDragUp = onMouseUp;
+
+        document.addEventListener("mousemove", onMouseMove);
+        document.addEventListener("mouseup", onMouseUp);
+
+        // Botão Vincular Termo Selecionado
+        let btnVincular = document.getElementById("btn-balao-vincular-destaque");
+        if (!btnVincular) {
+            btnVincular = document.createElement("button");
+            btnVincular.id = "btn-balao-vincular-destaque";
+            btnVincular.className = "btn-balao-action";
+            btnVincular.style = "background-color: var(--bg-app); border: 2px solid var(--accent); border-radius: 10px; padding: 6px 12px; font-size: 0.72rem; font-weight: 700; color: var(--accent); cursor: pointer; margin-right: 6px;";
+            btnVincular.innerText = "✨ Linkar Seleção";
+            btnVincular.onclick = () => {
+                const selText = window.getSelection().toString().trim();
+                if (!selText) {
+                    alert("Selecione um trecho de texto no enunciado da questão primeiro!");
+                    return;
+                }
+                passo.cor_destaque = "orange"; // grifa com laranja por default no preview
+                passo.termo_destaque = selText;
+
+                const qId = window.emPreviewCuracaoId;
+                const savedSteps = progressoUsuario.curacaoVal[qId]?.passos_correcao;
+                if (savedSteps && savedSteps[activePedagogicalStepIdx]) {
+                    savedSteps[activePedagogicalStepIdx].cor_destaque = "orange";
+                    savedSteps[activePedagogicalStepIdx].termo_destaque = selText;
+                }
+                
+                // Re-renderizar o balão para refletir a marcação
+                mostrarPassoBalao();
+                alert(`O termo "${selText}" foi vinculado como destaque para este passo!`);
+            };
+            const footer = popup.querySelector(".balao-footer-comic");
+            if (footer) {
+                footer.insertBefore(btnVincular, footer.firstChild);
+            }
+        }
+        btnVincular.style.display = "block";
+    } else {
+        conteudo.removeAttribute("contenteditable");
+        conteudo.style.border = "none";
+        conteudo.style.padding = "0";
+        conteudo.style.cursor = "default";
+        conteudo.title = "";
+        conteudo.onblur = null;
+
+        const dragBar = document.getElementById("balao-drag-bar");
+        if (dragBar) dragBar.style.display = "none";
+
+        const btnVincular = document.getElementById("btn-balao-vincular-destaque");
+        if (btnVincular) btnVincular.style.display = "none";
+    }
+
     let targetEl = null;
     const selectors = passo.targetSelector.split(",");
     for (const sel of selectors) {
@@ -2093,7 +2809,15 @@ function mostrarPassoBalao() {
         }
     }
 
-    if (targetEl) {
+    if (passo.customLeft !== undefined && passo.customTop !== undefined) {
+        popup.style.left = passo.customLeft;
+        popup.style.top = passo.customTop;
+        popup.style.transform = "none";
+        popup.className = "balao-explicativo-popup"; // no arrow if custom dragged
+        if (targetEl) {
+            targetEl.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+    } else if (targetEl) {
         const cardRect = card.getBoundingClientRect();
         const targetRect = targetEl.getBoundingClientRect();
         
@@ -2119,6 +2843,7 @@ function mostrarPassoBalao() {
         popup.className = "balao-explicativo-popup " + posSeta;
         popup.style.left = `${left}px`;
         popup.style.top = `${top}px`;
+        popup.style.transform = "none";
 
         const setaOffset = (targetRect.left - cardRect.left + (targetRect.width / 2)) - left - 9;
         
@@ -2139,8 +2864,8 @@ function mostrarPassoBalao() {
     }
 
     gsap.fromTo(popup, 
-        { opacity: 0, scale: 0.6, transformOrigin: "center bottom" }, 
-        { opacity: 1, scale: 1, duration: 0.35, ease: "back.out(1.8)" }
+        { opacity: 0, scale: 0, transformOrigin: "center center" }, 
+        { opacity: 1, scale: 1, duration: 0.45, ease: "back.out(1.7)" }
     );
 }
 
@@ -2331,16 +3056,35 @@ let questaoEmEdicaoId = null;
 window.editarQuestaoInline = function(qId) {
     questaoEmEdicaoId = qId;
     const qObj = obterQuestaoPorId(qId);
+    
+    // Apply current curado values first if any
+    let mergedQ = { ...qObj };
+    if (progressoUsuario.curacaoVal && progressoUsuario.curacaoVal[qId]) {
+        const curado = progressoUsuario.curacaoVal[qId];
+        mergedQ = {
+            ...mergedQ,
+            enunciado: curado.enunciado !== undefined ? curado.enunciado : mergedQ.enunciado,
+            gabarito: curado.gabarito !== undefined ? curado.gabarito : mergedQ.gabarito,
+            disciplina: curado.disciplina !== undefined ? curado.disciplina : mergedQ.disciplina,
+            assunto: curado.assunto !== undefined ? curado.assunto : mergedQ.assunto,
+            passos_correcao: curado.passos_correcao !== undefined ? curado.passos_correcao : mergedQ.passos_correcao
+        };
+    }
+
     const card = document.getElementById(`card-${qId}`);
     if (card) {
-        const newCard = criarQuestaoCard(qObj, false);
+        const newCard = criarQuestaoCard(mergedQ, false);
         card.replaceWith(newCard);
     }
     const focoCard = document.getElementById(`foco-card-${qId}`);
     if (focoCard) {
-        const newFoco = criarQuestaoCard(qObj, true);
+        const newFoco = criarQuestaoCard(mergedQ, true);
         focoCard.replaceWith(newFoco);
     }
+    
+    // Render the steps visually in the editor container
+    const steps = mergedQ.passos_correcao || obterAbstractStepsDefault(mergedQ);
+    window.atualizarVisualStepsEditor(qId, steps);
 };
 
 window.cancelarEdicaoQuestao = function(qId) {
@@ -2364,6 +3108,8 @@ window.salvarEdicaoQuestao = function(qId) {
     const bancaVal = document.getElementById(`edit-banca-${qId}`).value.trim();
     const disciplinaVal = document.getElementById(`edit-disciplina-${qId}`).value.trim();
     const assuntoVal = document.getElementById(`edit-assunto-${qId}`).value.trim();
+    
+    const passosVal = window.coletarPassosSalvosVisual(qId);
 
     if (!progressoUsuario.curacaoVal) {
         progressoUsuario.curacaoVal = {};
@@ -2377,6 +3123,7 @@ window.salvarEdicaoQuestao = function(qId) {
     progressoUsuario.curacaoVal[qId].banca = bancaVal;
     progressoUsuario.curacaoVal[qId].disciplina = disciplinaVal;
     progressoUsuario.curacaoVal[qId].assunto = assuntoVal;
+    progressoUsuario.curacaoVal[qId].passos_correcao = passosVal;
 
     salvarProgressoLocal();
     questaoEmEdicaoId = null;
@@ -2584,3 +3331,1793 @@ window.toggleMobileSidebar = function() {
     }
 };
 
+window.toggleSidebarCollapse = function() {
+    const layout = document.querySelector(".app-layout");
+    const arrow = document.querySelector(".btn-collapse-sidebar .icon-arrow");
+    if (layout) {
+        const isCollapsed = layout.classList.contains("sidebar-collapsed");
+        if (isCollapsed) {
+            layout.classList.remove("sidebar-collapsed");
+            if (arrow) arrow.innerText = "◀";
+            localStorage.setItem("remb_sidebar_collapsed", "false");
+        } else {
+            layout.classList.add("sidebar-collapsed");
+            if (arrow) arrow.innerText = "▶";
+            localStorage.setItem("remb_sidebar_collapsed", "true");
+        }
+    }
+};
+
+window.alternarModoSimulado = function() {
+    const isChecked = document.getElementById("toggleModoSimulado").checked;
+    emModoSimulado = isChecked;
+    simuladoFinalizado = false;
+    
+    const btnFinalizar = document.getElementById("btnFinalizarSimulado");
+    if (btnFinalizar) {
+        btnFinalizar.style.display = isChecked ? "block" : "none";
+    }
+
+    aplicarFiltros();
+};
+
+window.finalizarSimulado = function() {
+    simuladoFinalizado = true;
+    
+    let respondidasSimulado = 0;
+    let acertosSimulado = 0;
+    
+    const visibleCards = document.querySelectorAll(".questao-card");
+    visibleCards.forEach(card => {
+        const qId = card.id.replace("card-", "").replace("foco-card-", "");
+        const resp = progressoUsuario.respondidas[qId];
+        if (resp) {
+            respondidasSimulado++;
+            if (resp.correta) acertosSimulado++;
+        }
+    });
+
+    if (respondidasSimulado === 0) {
+        alert("Você não respondeu nenhuma questão neste simulado!");
+        simuladoFinalizado = false;
+        return;
+    }
+
+    const modal = document.createElement("div");
+    modal.style.position = "fixed";
+    modal.style.top = "0";
+    modal.style.left = "0";
+    modal.style.width = "100%";
+    modal.style.height = "100vh";
+    modal.style.backgroundColor = "rgba(0,0,0,0.6)";
+    modal.style.backdropFilter = "blur(8px)";
+    modal.style.zIndex = "2000";
+    modal.style.display = "flex";
+    modal.style.justifyContent = "center";
+    modal.style.alignItems = "center";
+    modal.id = "simuladoResultModal";
+
+    const percent = Math.round((acertosSimulado / respondidasSimulado) * 100);
+
+    modal.innerHTML = `
+        <div class="result-box" style="background-color: var(--bg-card); padding: 30px; border-radius: 16px; border: 3px solid #000; box-shadow: 6px 6px 0px #000; width: 90%; max-width: 500px; text-align: center; font-family: var(--font-heading);">
+            <div style="font-size: 3rem; margin-bottom: 15px;">🏆</div>
+            <h2 style="font-size: 1.8rem; font-weight: 800; color: var(--text-primary); margin-bottom: 10px;">Simulado Concluído!</h2>
+            <p style="font-size: 1.05rem; color: var(--text-secondary); margin-bottom: 25px;">
+                Você resolveu <strong>${respondidasSimulado}</strong> questões e obteve <strong>${acertosSimulado}</strong> acertos.
+            </p>
+            
+            <div style="font-size: 2.2rem; font-weight: 800; color: ${percent >= 70 ? 'var(--correta)' : 'var(--errada)'}; margin-bottom: 20px;">
+                ${percent}% de Aproveitamento
+            </div>
+
+            <div style="display:flex; flex-direction:column; gap:12px;">
+                <button class="btn btn-primary" onclick="window.imprimirRelatorioSimulado()" style="border-radius:10px; font-weight:700; width:100%; box-shadow:2px 2px 0px #000; border:2.5px solid #000; color:#fff;">
+                    🖨️ Imprimir / Gerar PDF de Gabarito
+                </button>
+                <button class="btn btn-outline-secondary" onclick="window.fecharModalSimulado()" style="border-radius:10px; font-weight:600; width:100%;">
+                    Ver Detalhes das Resoluções
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+    gsap.from("#simuladoResultModal .result-box", { scale: 0.8, opacity: 0, duration: 0.3, ease: "back.out(1.7)" });
+
+    aplicarFiltros();
+};
+
+window.fecharModalSimulado = function() {
+    const modal = document.getElementById("simuladoResultModal");
+    if (modal) {
+        gsap.to("#simuladoResultModal .result-box", { scale: 0.8, opacity: 0, duration: 0.25, onComplete: () => modal.remove() });
+    }
+};
+
+window.imprimirRelatorioSimulado = function() {
+    window.fecharModalSimulado();
+    setTimeout(() => {
+        window.print();
+    }, 300);
+};
+
+window.alterarOpacidadeGrifos = function(val) {
+    const opacity = val / 100;
+    document.documentElement.style.setProperty('--highlight-opacity', opacity);
+    const display = document.getElementById("opacityDisplay");
+    if (display) display.innerText = `${val}%`;
+    localStorage.setItem("remb_highlight_opacity", val);
+    
+    // Salvar no dicionário de memórias de opacidade por caneta
+    if (typeof canetaAtiva !== 'undefined' && canetaAtiva && canetaAtiva !== 'eraser') {
+        opacidadeCanetas[canetaAtiva] = parseInt(val);
+        localStorage.setItem("remb_opacidades_canetas", JSON.stringify(opacidadeCanetas));
+    }
+    
+    if (typeof window.atualizarVisualSliderFlutuante === 'function') {
+        window.atualizarVisualSliderFlutuante(parseInt(val));
+    }
+
+    // Se houver uma marcação ativa selecionada agora, atualiza especificamente ela
+    if (activeHighlightSpan) {
+        const cor = activeHighlightSpan.getAttribute("data-color");
+        if (cor) {
+            activeHighlightSpan.style.setProperty("background-color", obterRGBACorCaneta(cor, val), "important");
+            activeHighlightSpan.setAttribute("data-opacity", val);
+        }
+    }
+};
+
+window.alternarHoverCorretivo = function(checked) {
+    const sheet = document.getElementById("dynamic-selection-style");
+    if (sheet) {
+        if (checked) {
+            sheet.innerHTML = `
+                .em-correcao .termo-erro-tachado[data-tooltip]:hover::after {
+                    content: ' (' attr(data-tooltip) ')';
+                    color: var(--correta) !important;
+                    font-weight: bold;
+                    text-decoration: none;
+                    display: inline;
+                }
+            `;
+        } else {
+            sheet.innerHTML = "";
+        }
+    }
+    localStorage.setItem("remb_hover_corretivo", checked ? "true" : "false");
+};
+
+window.inicializarSliderOpacidadeFlutuante = function() {
+    const container = document.getElementById("verticalOpacitySliderContainer");
+    const handle = document.getElementById("highlighterOpacityHandle");
+    const fill = document.getElementById("highlighterOpacityFill");
+    
+    if (!container || !handle || !fill) return;
+
+    let isDragging = false;
+
+    function atualizarOpacidadeDeY(yRelative) {
+        const height = container.clientHeight;
+        let pct = 1 - (yRelative / height); // 0 na base, 1 no topo
+        pct = Math.max(0, Math.min(1, pct)); // Clampar entre 0 e 1
+        
+        // Mapear de 15% a 75%
+        const opacityVal = Math.round(15 + pct * 60);
+        
+        window.alterarOpacidadeGrifos(opacityVal);
+        
+        const sliderAjustes = document.getElementById("opacitySlider");
+        if (sliderAjustes) {
+            sliderAjustes.value = opacityVal;
+            const display = document.getElementById("opacityDisplay");
+            if (display) display.innerText = `${opacityVal}%`;
+        }
+    }
+
+    window.atualizarVisualSliderFlutuante = function(opacityVal) {
+        const pct = (opacityVal - 15) / 60;
+        const bottomPct = pct * 100;
+        
+        handle.style.bottom = `calc(${bottomPct}% - 7px)`;
+        fill.style.height = `${bottomPct}%`;
+    };
+
+    container.addEventListener("mousedown", (e) => {
+        isDragging = true;
+        const rect = container.getBoundingClientRect();
+        const y = e.clientY - rect.top;
+        atualizarOpacidadeDeY(y);
+        
+        document.addEventListener("mousemove", onMouseMove);
+        document.addEventListener("mouseup", onMouseUp);
+    });
+
+    function onMouseMove(e) {
+        if (!isDragging) return;
+        const rect = container.getBoundingClientRect();
+        const y = e.clientY - rect.top;
+        atualizarOpacidadeDeY(y);
+    }
+
+    function onMouseUp() {
+        isDragging = false;
+        document.removeEventListener("mousemove", onMouseMove);
+        document.removeEventListener("mouseup", onMouseUp);
+    }
+
+    // Suporte a Toque (Mobile/Tablet)
+    container.addEventListener("touchstart", (e) => {
+        isDragging = true;
+        const rect = container.getBoundingClientRect();
+        const touch = e.touches[0];
+        const y = touch.clientY - rect.top;
+        atualizarOpacidadeDeY(y);
+        
+        document.addEventListener("touchmove", onTouchMove, { passive: false });
+        document.addEventListener("touchend", onTouchEnd);
+    });
+
+    function onTouchMove(e) {
+        if (!isDragging) return;
+        e.preventDefault();
+        const rect = container.getBoundingClientRect();
+        const touch = e.touches[0];
+        const y = touch.clientY - rect.top;
+        atualizarOpacidadeDeY(y);
+    }
+
+    function onTouchEnd() {
+        isDragging = false;
+        document.removeEventListener("touchmove", onTouchMove);
+        document.removeEventListener("touchend", onTouchEnd);
+    }
+    
+    const stored = localStorage.getItem("remb_highlight_opacity") || "45";
+    window.atualizarVisualSliderFlutuante(parseInt(stored));
+};
+
+window.configurarAtalhosTecladoCaneta = function() {
+    document.addEventListener("keydown", (e) => {
+        // Ignorar atalhos de teclado se estiver digitando em formulários
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
+            return;
+        }
+        
+        const key = e.key;
+        let corTarget = null;
+        let btnClass = null;
+        
+        if (key === '1') { corTarget = 'yellow'; btnClass = '.btn-amarelo'; }
+        else if (key === '2') { corTarget = 'green'; btnClass = '.btn-verde'; }
+        else if (key === '3') { corTarget = 'blue'; btnClass = '.btn-azul'; }
+        else if (key === '4') { corTarget = 'pink'; btnClass = '.btn-rosa'; }
+        else if (key === '5') { corTarget = 'orange'; btnClass = '.btn-laranja'; }
+        else if (key === '0' || key.toLowerCase() === 'e') { corTarget = 'eraser'; btnClass = '.highlighter-eraser'; }
+        else if (key === 'Escape') {
+            if (canetaAtiva) {
+                const activeBtn = document.querySelector(".sticky-highlighter-bar button.active");
+                if (activeBtn) activeBtn.classList.remove("active");
+                canetaAtiva = null;
+                atualizarSelecaoCSS(null);
+                atualizarDicaSemantica(null);
+            }
+            activeHighlightSpan = null;
+            return;
+        }
+        
+        if (corTarget && btnClass) {
+            const btnEl = document.querySelector(`.sticky-highlighter-bar ${btnClass}`);
+            if (btnEl) {
+                setCanetaAtiva(corTarget, btnEl);
+            }
+        }
+    });
+};
+
+window.enviarParaLaboratorio = function(qId) {
+    const qObj = obterQuestaoPorId(qId);
+    if (!qObj) {
+        alert("Questão não encontrada!");
+        return;
+    }
+
+    // Garantir que o array do laboratório exista
+    if (typeof QUESTOES_CESPE_TRATADAS === 'undefined') {
+        window.QUESTOES_CESPE_TRATADAS = [];
+    }
+
+    // Verificar se já existe no laboratório
+    const jaExiste = QUESTOES_CESPE_TRATADAS.some(q => q.id === qId);
+    if (jaExiste) {
+        alert("Esta questão já se encontra no Laboratório de Curação!");
+        navegarPara('validacao');
+        return;
+    }
+
+    // Criar uma cópia isolada da questão
+    const copia = JSON.parse(JSON.stringify(qObj));
+    
+    // Configurar metadados do laboratório
+    copia.labId = `LAB-${copia.numero || copia.id.replace(/\D/g, "") || 'ADD'}`;
+    if (!copia.origem_importacao) {
+        copia.origem_importacao = {
+            arquivo: "Importado da Sala",
+            numero_original: copia.numero || 1
+        };
+    }
+
+    // Colocar no início do laboratório
+    QUESTOES_CESPE_TRATADAS.unshift(copia);
+
+    // Persistir localmente no progresso do usuário
+    if (!progressoUsuario.questoesLaboratorioAdicionais) {
+        progressoUsuario.questoesLaboratorioAdicionais = [];
+    }
+    progressoUsuario.questoesLaboratorioAdicionais.push(copia);
+    salvarProgressoLocal();
+
+    // Recarregar os filtros do laboratório
+    if (typeof inicializarFiltrosVal === 'function') {
+        inicializarFiltrosVal();
+    }
+
+    alert(`Questão ${qObj.numero || ''} enviada com sucesso para o Laboratório de Curação!`);
+    navegarPara('validacao');
+};
+
+let bancaSelecionadaTab = 'todas';
+
+window.selecionarBancaTab = function(banca) {
+    bancaSelecionadaTab = banca;
+    
+    // Atualizar visual das abas
+    const tabs = document.querySelectorAll(".banca-tab");
+    tabs.forEach(t => {
+        if (t.getAttribute("data-banca") === banca) {
+            t.classList.add("active");
+        } else {
+            t.classList.remove("active");
+        }
+    });
+
+    // Renderizar
+    window.renderizarBibliotecaProvas();
+};
+
+window.renderizarBibliotecaProvas = function() {
+    const container = document.getElementById("provasGridContainer");
+    if (!container) return;
+
+    const filterAno = document.getElementById("filterAnoProvas").value;
+    const searchVal = document.getElementById("searchProva").value.trim().toLowerCase();
+
+    // Filtrar provas
+    const filtradas = BANCO_PROVAS.filter(p => {
+        if (bancaSelecionadaTab !== "todas" && p.banca !== bancaSelecionadaTab) return false;
+        if (filterAno !== "todos" && p.ano !== filterAno) return false;
+        if (searchVal) {
+            const matchesSearch = p.orgao.toLowerCase().includes(searchVal) ||
+                                  p.cargo.toLowerCase().includes(searchVal) ||
+                                  p.banca.toLowerCase().includes(searchVal) ||
+                                  p.ano.includes(searchVal);
+            if (!matchesSearch) return false;
+        }
+        return true;
+    });
+
+    container.innerHTML = "";
+
+    // Atualizar contador total no primeiro card de estatística
+    const totalCountEl = document.getElementById("stats-total-provas");
+    if (totalCountEl) {
+        totalCountEl.innerText = filtradas.length;
+    }
+
+    if (filtradas.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 40px; color: var(--text-secondary); width: 100%;">
+                <p style="font-size: 1.1rem; font-weight: 600;">Nenhuma prova localizada com os filtros ativos.</p>
+            </div>
+        `;
+        return;
+    }
+
+    filtradas.forEach(p => {
+        const col = document.createElement("div");
+        col.className = "col-md-6 col-lg-4";
+        col.style.display = "flex";
+        col.style.marginBottom = "20px";
+
+        // Cores específicas por banca para uma estética premium
+        let badgeColor = "var(--accent)";
+        let badgeBg = "var(--accent-light)";
+        let cardBancaClass = "banca-padrao";
+        if (p.banca === "Cebraspe") { badgeColor = "#3b82f6"; badgeBg = "rgba(59,130,246,0.1)"; cardBancaClass = "banca-cebraspe"; }
+        else if (p.banca === "FGV") { badgeColor = "#f59e0b"; badgeBg = "rgba(245,158,11,0.1)"; cardBancaClass = "banca-fgv"; }
+        else if (p.banca === "Cesgranrio") { badgeColor = "#10b981"; badgeBg = "rgba(16,185,129,0.1)"; cardBancaClass = "banca-cesgranrio"; }
+        else if (p.banca === "FCC") { badgeColor = "#ec4899"; badgeBg = "rgba(236,72,153,0.1)"; cardBancaClass = "banca-fcc"; }
+        else if (p.banca === "Vunesp") { badgeColor = "#a855f7"; badgeBg = "rgba(168,85,247,0.1)"; cardBancaClass = "banca-vunesp"; }
+
+        // Verificar se temos questões associadas a este arquivo localmente
+        let hasQuestions = false;
+        if (typeof BANCO_QUESTOES !== 'undefined') {
+            hasQuestions = BANCO_QUESTOES.some(q => q.origem_importacao?.arquivo === p.file);
+        }
+        let hasLabQuestions = false;
+        if (typeof QUESTOES_CESPE_TRATADAS !== 'undefined') {
+            hasLabQuestions = QUESTOES_CESPE_TRATADAS.some(q => q.origem_importacao?.arquivo === p.file);
+        }
+
+        col.innerHTML = `
+            <div class="premium-prova-card ${cardBancaClass}" style="transition: all 0.25s ease;">
+                <div>
+                    <!-- Header do Card -->
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                        <span class="meta-badge" style="background-color: ${badgeBg}; color: ${badgeColor}; font-weight: 800; border: none; font-size: 0.72rem; padding: 4px 10px; border-radius: 6px;">
+                            ${p.banca.toUpperCase()}
+                        </span>
+                        <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary);">
+                            📅 ${p.ano}
+                        </span>
+                    </div>
+
+                    <!-- Corpo do Card -->
+                    <h3 style="font-size:1.08rem; font-weight:800; color:var(--text-primary); margin:0 0 6px 0; line-height:1.35;">
+                        ${p.orgao}
+                    </h3>
+                    <p style="font-size:0.85rem; color:var(--text-secondary); margin:0 0 12px 0; font-weight:500;">
+                        💼 Cargo: ${p.cargo}
+                    </p>
+                    
+                    <div style="display:flex; gap:8px; margin-bottom:15px; flex-wrap:wrap;">
+                        <span style="font-size:0.7rem; background-color:var(--bg-app); border:1px solid var(--border); border-radius:6px; padding:2px 8px; color:var(--text-secondary); font-weight:600;">
+                            🎓 ${p.nivel}
+                        </span>
+                        ${hasQuestions ? `
+                            <span style="font-size:0.7rem; background-color:var(--correta-light); border:1px solid var(--correta); border-radius:6px; padding:2px 8px; color:var(--correta); font-weight:700;">
+                                📝 Simulável (Pilot)
+                            </span>
+                        ` : ""}
+                    </div>
+                </div>
+
+                <!-- Ações do Card -->
+                <div style="display:flex; gap:10px; border-top: 1px dashed var(--border); padding-top:12px; margin-top:10px;">
+                    <button class="btn btn-outline-primary btn-sm" onclick="window.abrirProvaNaSala('${p.id}', '${p.file}', '${p.banca}')" style="flex:1; border-radius:8px; font-size:0.75rem; font-weight:700; padding:6px 8px; border-width:1.5px;">
+                        📥 Resolver Sala
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="window.abrirProvaNoLaboratorio('${p.id}', '${p.file}')" style="flex:1; border-radius:8px; font-size:0.75rem; font-weight:700; padding:6px 8px; border-width:1.5px; dots ${hasLabQuestions ? '' : 'opacity:0.6;'}">
+                        🧪 Curação Lab
+                    </button>
+                </div>
+
+                <!-- Arquivos para Download -->
+                <div style="display:flex; justify-content:space-between; gap:4px; margin-top:12px; padding-top:8px; border-top: 1px solid var(--border); font-size:0.68rem; font-weight:600; flex-wrap:wrap; user-select:none;">
+                    <span style="color:var(--text-secondary); margin-right:4px;">Downloads:</span>
+                    <a href="#" onclick="window.baixarArquivoProva(event, '${p.id}', '${p.banca}', '${p.orgao}', '${p.ano}', '${p.cargo}', 'prova')" style="color:var(--accent); text-decoration:none; margin-right:6px;" title="Baixar Caderno de Prova">📄 Prova</a>
+                    <a href="#" onclick="window.baixarArquivoProva(event, '${p.id}', '${p.banca}', '${p.orgao}', '${p.ano}', '${p.cargo}', 'gabarito')" style="color:var(--accent); text-decoration:none; margin-right:6px;" title="Baixar Gabarito Oficial">✅ Gabarito</a>
+                    <a href="#" onclick="window.baixarArquivoProva(event, '${p.id}', '${p.banca}', '${p.orgao}', '${p.ano}', '${p.cargo}', 'edital')" style="color:var(--accent); text-decoration:none; margin-right:6px;" title="Baixar Edital do Concurso">📘 Edital</a>
+                    <a href="#" onclick="window.baixarArquivoProva(event, '${p.id}', '${p.banca}', '${p.orgao}', '${p.ano}', '${p.cargo}', 'recurso')" style="color:var(--accent); text-decoration:none;" title="Baixar Recursos / Pareceres">⚖️ Recurso</a>
+                </div>
+            </div>
+        `;
+
+        // Aplicar micro-animações GSAP
+        const cardEl = col.querySelector(".premium-prova-card");
+        cardEl.addEventListener("mouseenter", () => {
+            gsap.to(cardEl, { y: -4, borderColor: badgeColor, boxShadow: `0 8px 20px rgba(0,0,0,0.06)`, duration: 0.25 });
+        });
+        cardEl.addEventListener("mouseleave", () => {
+            gsap.to(cardEl, { y: 0, borderColor: "var(--border)", boxShadow: "0 4px 10px rgba(0,0,0,0.02)", duration: 0.25 });
+        });
+
+        container.appendChild(col);
+    });
+};
+
+window.aplicarFiltrosProvas = function() {
+    window.renderizarBibliotecaProvas();
+};
+
+window.abrirProvaNaSala = function(provaId, file, banca) {
+    const provaObj = BANCO_PROVAS.find(p => p.id === provaId);
+    
+    // 1. Achar se há questões desta lista no BANCO_QUESTOES
+    let hasQuestions = false;
+    if (typeof BANCO_QUESTOES !== 'undefined') {
+        hasQuestions = BANCO_QUESTOES.some(q => q.origem_importacao?.arquivo === file);
+    }
+
+    if (hasQuestions) {
+        globalProvaAtiva = provaObj;
+        
+        // Ajustar os filtros da Sala de Questões
+        const filterLista = document.getElementById("filterListaOrigem");
+        if (filterLista) {
+            filterLista.value = "todas"; // Não seleciona nenhuma lista de origem (pois veio de prova)
+        }
+        
+        // Segue a banca da prova selecionada
+        const filterBanca = document.getElementById("filterBanca");
+        if (filterBanca && provaObj) {
+            if (provaObj.banca.toLowerCase() === "cebraspe" || provaObj.banca.toLowerCase() === "cespe") {
+                filterBanca.value = "Cebraspe";
+            } else {
+                filterBanca.value = provaObj.banca;
+            }
+        }
+        const filterDisc = document.getElementById("filterDisciplina");
+        if (filterDisc) {
+            filterDisc.value = "todas";
+        }
+        const filterAssunto = document.getElementById("filterAssunto");
+        if (filterAssunto) {
+            filterAssunto.value = "todos";
+        }
+        
+        // Aplicar filtros e navegar para a sala de questões
+        aplicarFiltros();
+        navegarPara('questoes');
+        
+        // Avisar ao usuário
+        alert(`Filtro aplicado: mostrando as questões do caderno da prova.`);
+    } else {
+        // Se for uma das provas que levantamos mas cujas questões ainda não foram importadas
+        alert(`A prova selecionada está cadastrada no levantamento histórico da Biblioteca, mas o arquivo de questões (${file}) ainda não foi processado pelo pipeline da API da Biblioteca de Concursos (Sister Project).\n\nMocking: Redirecionando para as questões da banca ${banca} na Sala.`);
+        
+        const filterBanca = document.getElementById("filterBanca");
+        if (filterBanca) {
+            if (banca === "Cebraspe") filterBanca.value = "CESPE";
+            else if (banca === "FGV") filterBanca.value = "FGV";
+            else filterBanca.value = "todas";
+        }
+        
+        const filterLista = document.getElementById("filterListaOrigem");
+        if (filterLista) filterLista.value = "todas";
+        
+        aplicarFiltros();
+        navegarPara('questoes');
+    }
+};
+
+window.abrirProvaNoLaboratorio = function(provaId, file) {
+    let hasLabQuestions = false;
+    if (typeof QUESTOES_CESPE_TRATADAS !== 'undefined') {
+        hasLabQuestions = QUESTOES_CESPE_TRATADAS.some(q => q.origem_importacao?.arquivo === file);
+    }
+
+    if (hasLabQuestions) {
+        const filterVal = document.getElementById("filterListaVal");
+        if (filterVal) {
+            filterVal.value = file;
+        }
+        
+        aplicarFiltrosVal();
+        navegarPara('validacao');
+        
+        alert(`Fila do Laboratório filtrada pelo arquivo da Prova selecionada.`);
+    } else {
+        alert(`Não há questões pendentes de curação no Laboratório para este arquivo de prova (${file}). Todas as questões já foram integradas à base oficial de produção.`);
+    }
+};
+
+/* =====================================
+   FUNÇÃO DE DOWNLOAD DE ARQUIVOS DE PROVAS
+===================================== */
+window.baixarArquivoProva = function(event, provaId, banca, orgao, ano, cargo, tipo) {
+    if (event) event.preventDefault();
+    
+    // Se for a prova do TCU 2026, servimos do backend
+    if (provaId === 'cebraspe-tcu-2026') {
+        if (tipo === 'prova') {
+            window.open('http://localhost:3001/arquivos-provas/cespe-cebraspe-2026-tcu-auditor-federal-de-controle-externo-area-de-controle-externo-orientacao-auditoria-de-tecnologia-da-informacao-prova.pdf', '_blank');
+            return;
+        }
+        if (tipo === 'gabarito') {
+            window.open('http://localhost:3001/arquivos-gabaritos/cespe-cebraspe-2026-tcu-auditor-federal-de-controle-externo-area-de-controle-externo-orientacao-auditoria-de-tecnologia-da-informacao-gabarito.pdf', '_blank');
+            return;
+        }
+    }
+    
+    // Fallback: faz busca no Google pelo PDF do arquivo de origem
+    const query = `${banca} ${orgao} ${ano} ${cargo} ${tipo} pdf`;
+    const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+    window.open(searchUrl, '_blank');
+};
+
+/* =====================================
+   FUNÇÕES DO EDITOR VISUAL DE CORREÇÃO
+===================================== */
+window.atualizarVisualStepsEditor = function(qId, steps) {
+    const container = document.getElementById(`visual-steps-container-${qId}`);
+    if (!container) return;
+    container.innerHTML = "";
+
+    if (steps.length === 0) {
+        container.innerHTML = `<div style="text-align:center; padding:15px; color:var(--text-secondary); font-size:0.85rem; border:1px dashed var(--border); border-radius:8px;">Nenhum passo cadastrado. Adicione um novo passo para configurar.</div>`;
+        return;
+    }
+
+    steps.forEach((step, idx) => {
+        const stepCard = document.createElement("div");
+        stepCard.className = "visual-step-card";
+        stepCard.style = "background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 12px; position: relative;";
+        
+        const isGrifar = step.cor_destaque && step.cor_destaque !== 'none' && step.cor_destaque !== 'tachar';
+        const isTachar = step.cor_destaque === 'tachar';
+
+        let effectVal = "none";
+        if (isGrifar) effectVal = "grifar";
+        if (isTachar) effectVal = "tachar";
+
+        stepCard.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid var(--border); padding-bottom:6px;">
+                <span style="font-size:0.8rem; font-weight:800; color:var(--accent);">Passo #${idx + 1}</span>
+                <div style="display:flex; gap:6px;">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.moverPassoVisual('${qId}', ${idx}, -1)" ${idx === 0 ? 'disabled style="opacity:0.3; cursor:not-allowed;"' : ''} style="padding:2px 6px; font-size:0.7rem; cursor:pointer;">▲</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.moverPassoVisual('${qId}', ${idx}, 1)" ${idx === steps.length - 1 ? 'disabled style="opacity:0.3; cursor:not-allowed;"' : ''} style="padding:2px 6px; font-size:0.7rem; cursor:pointer;">▼</button>
+                    <button type="button" class="btn btn-outline-danger btn-sm" onclick="window.removerPassoVisual('${qId}', ${idx})" style="padding:2px 6px; font-size:0.7rem; color:var(--errada); border-color:var(--errada); cursor:pointer;">Excluir</button>
+                </div>
+            </div>
+            
+            <div style="display:flex; flex-direction:column; gap:8px;">
+                <div style="display:flex; gap:10px;">
+                    <div style="flex:1;">
+                        <label style="display:block; font-size:0.72rem; font-weight:600; margin-bottom:2px; color:var(--text-secondary);">Título do Passo:</label>
+                        <input type="text" class="step-title-${qId}" value="${step.titulo || ''}" style="width:100%; padding:6px; border-radius:6px; border:1px solid var(--border); background-color:var(--bg-app); color:var(--text-primary); font-size:0.82rem;">
+                    </div>
+                    <div style="width:140px;">
+                        <label style="display:block; font-size:0.72rem; font-weight:600; margin-bottom:2px; color:var(--text-secondary);">Foco / Alvo:</label>
+                        <select class="step-target-${qId}" style="width:100%; padding:6px; border-radius:6px; border:1px solid var(--border); background-color:var(--bg-app); color:var(--text-primary); font-size:0.82rem; cursor:pointer;">
+                            <option value="header" ${step.target === 'header' ? 'selected' : ''}>Cabeçalho</option>
+                            <option value="enunciado" ${step.target === 'enunciado' ? 'selected' : ''}>Enunciado</option>
+                            <option value="gabarito" ${step.target === 'gabarito' ? 'selected' : ''}>Gabarito</option>
+                            <option value="A" ${step.target === 'A' ? 'selected' : ''}>Alternativa A</option>
+                            <option value="B" ${step.target === 'B' ? 'selected' : ''}>Alternativa B</option>
+                            <option value="C" ${step.target === 'C' ? 'selected' : ''}>Alternativa C</option>
+                            <option value="D" ${step.target === 'D' ? 'selected' : ''}>Alternativa D</option>
+                            <option value="E" ${step.target === 'E' ? 'selected' : ''}>Alternativa E</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div>
+                    <label style="display:block; font-size:0.72rem; font-weight:600; margin-bottom:2px; color:var(--text-secondary);">Texto do Balão:</label>
+                    <textarea class="step-text-${qId}" style="width:100%; min-height:50px; padding:6px; border-radius:6px; border:1px solid var(--border); background-color:var(--bg-app); color:var(--text-primary); font-size:0.82rem; font-family:inherit; resize:vertical; line-height:1.3;">${step.texto || ''}</textarea>
+                </div>
+                
+                <div style="display:flex; gap:10px; align-items:flex-end;">
+                    <div style="flex:1;">
+                        <label style="display:block; font-size:0.72rem; font-weight:600; margin-bottom:2px; color:var(--text-secondary);">Efeito Visual:</label>
+                        <select class="step-effect-${qId}" onchange="window.toggleStepEffectFields('${qId}', dots ${idx}, this.value)" style="width:100%; padding:6px; border-radius:6px; border:1px solid var(--border); background-color:var(--bg-app); color:var(--text-primary); font-size:0.82rem; cursor:pointer;">
+                            <option value="none" ${effectVal === 'none' ? 'selected' : ''}>Nenhum</option>
+                            <option value="grifar" ${effectVal === 'grifar' ? 'selected' : ''}>Grifar Termo do Enunciado</option>
+                            <option value="tachar" ${effectVal === 'tachar' ? 'selected' : ''}>Tachar Alternativa</option>
+                        </select>
+                    </div>
+                    
+                    <div id="step-highlight-inputs-${qId}-dots ${idx}" style="flex:2; display:dots ${effectVal === 'grifar' ? 'flex' : 'none'}; gap:6px;">
+                        <div style="flex:2;">
+                            <label style="display:block; font-size:0.72rem; font-weight:600; margin-bottom:2px; color:var(--text-secondary);">Termo a ser Grifado:</label>
+                            <input type="text" class="step-term-${qId}" value="${step.termo_destaque || ''}" placeholder="Ex: desvio de poder" style="width:100%; padding:6px; border-radius:6px; border:1px solid var(--border); background-color:var(--bg-app); color:var(--text-primary); font-size:0.82rem;">
+                        </div>
+                        <div style="flex:1;">
+                            <label style="display:block; font-size:0.72rem; font-weight:600; margin-bottom:2px; color:var(--text-secondary);">Cor:</label>
+                            <select class="step-color-${qId}" style="width:100%; padding:6px; border-radius:6px; border:1px solid var(--border); background-color:var(--bg-app); color:var(--text-primary); font-size:0.82rem; cursor:pointer;">
+                                <option value="orange" ${step.cor_destaque === 'orange' ? 'selected' : ''}>Laranja (Fato)</option>
+                                <option value="green" ${step.cor_destaque === 'green' ? 'selected' : ''}>Verde (Comando)</option>
+                                <option value="blue" ${step.cor_destaque === 'blue' ? 'selected' : ''}>Azul (Norma)</option>
+                                <option value="pink" ${step.cor_destaque === 'pink' ? 'selected' : ''}>Rosa (Dados)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        container.appendChild(stepCard);
+    });
+};
+
+window.toggleStepEffectFields = function(qId, idx, value) {
+    const fieldsDiv = document.getElementById(`step-highlight-inputs-${qId}-${idx}`);
+    if (fieldsDiv) {
+        fieldsDiv.style.display = value === 'grifar' ? 'flex' : 'none';
+    }
+};
+
+window.adicionarPassoVisual = function(qId) {
+    const steps = window.coletarPassosSalvosVisual(qId);
+    steps.push({
+        titulo: "Novo Passo",
+        texto: "",
+        target: "header",
+        cor_destaque: "none",
+        termo_destaque: ""
+    });
+    window.atualizarVisualStepsEditor(qId, steps);
+};
+
+window.removerPassoVisual = function(qId, idx) {
+    const steps = window.coletarPassosSalvosVisual(qId);
+    steps.splice(idx, 1);
+    window.atualizarVisualStepsEditor(qId, steps);
+};
+
+window.moverPassoVisual = function(qId, idx, direcao) {
+    const steps = window.coletarPassosSalvosVisual(qId);
+    const targetIdx = idx + direcao;
+    if (targetIdx >= 0 && targetIdx < steps.length) {
+        const temp = steps[idx];
+        steps[idx] = steps[targetIdx];
+        steps[targetIdx] = temp;
+        window.atualizarVisualStepsEditor(qId, steps);
+    }
+};
+
+window.coletarPassosSalvosVisual = function(qId) {
+    const container = document.getElementById(`visual-steps-container-${qId}`);
+    if (!container) return [];
+    
+    const cards = container.querySelectorAll(".visual-step-card");
+    const steps = [];
+    
+    cards.forEach((card) => {
+        const title = card.querySelector(`.step-title-${qId}`).value.trim();
+        const target = card.querySelector(`.step-target-${qId}`).value;
+        const text = card.querySelector(`.step-text-${qId}`).value.trim();
+        const effect = card.querySelector(`.step-effect-${qId}`).value;
+        
+        let cor_destaque = "none";
+        let termo_destaque = "";
+        
+        if (effect === 'grifar') {
+            cor_destaque = card.querySelector(`.step-color-${qId}`).value;
+            termo_destaque = card.querySelector(`.step-term-${qId}`).value.trim();
+        } else if (effect === 'tachar') {
+            cor_destaque = "tachar";
+        }
+        
+        steps.push({
+            titulo: title,
+            texto: text,
+            target: target,
+            cor_destaque: cor_destaque,
+            termo_destaque: termo_destaque
+        });
+    });
+    
+    return steps;
+};
+
+/* ==========================================================================
+   MELHORIAS: PREVIEW DA CORREÇÃO & PAINEL DE ESTATÍSTICAS
+   ========================================================================== */
+window.emPreviewCuracaoId = null;
+
+window.gerarPreviewCorrecao = function(qId) {
+    // 1. Coletar os valores do editor
+    const enunciadoVal = document.getElementById(`edit-enunciado-${qId}`).value.trim();
+    const gabaritoVal = document.getElementById(`edit-gabarito-${qId}`).value;
+    const bancaVal = document.getElementById(`edit-banca-${qId}`).value.trim();
+    const disciplinaVal = document.getElementById(`edit-disciplina-${qId}`).value.trim();
+    const assuntoVal = document.getElementById(`edit-assunto-${qId}`).value.trim();
+    const passosVal = window.coletarPassosSalvosVisual(qId);
+
+    // 2. Salvar temporariamente no progressoUsuario para que o card renderizado leia as alterações
+    if (!progressoUsuario.curacaoVal) {
+        progressoUsuario.curacaoVal = {};
+    }
+    if (!progressoUsuario.curacaoVal[qId]) {
+        progressoUsuario.curacaoVal[qId] = {};
+    }
+    progressoUsuario.curacaoVal[qId].enunciado = enunciadoVal;
+    progressoUsuario.curacaoVal[qId].gabarito = gabaritoVal;
+    progressoUsuario.curacaoVal[qId].banca = bancaVal;
+    progressoUsuario.curacaoVal[qId].disciplina = disciplinaVal;
+    progressoUsuario.curacaoVal[qId].assunto = assuntoVal;
+    progressoUsuario.curacaoVal[qId].passos_correcao = passosVal;
+
+    // 3. Ativar flag de preview
+    window.emPreviewCuracaoId = qId;
+    questaoEmEdicaoId = null; // para que criarQuestaoCard não renderize a tela de edição
+
+    // 4. Forçar re-renderização do card em modo solved normal (com a barra de preview)
+    const qObj = obterQuestaoPorId(qId);
+    
+    // Mesclar temporariamente no objeto qObj para visualização correta
+    const mergedQ = {
+        ...qObj,
+        enunciado: enunciadoVal,
+        gabarito: gabaritoVal,
+        disciplina: disciplinaVal,
+        assunto: assuntoVal,
+        passos_correcao: passosVal,
+        origem_questao: { ...qObj.origem_questao, banca: bancaVal }
+    };
+
+    const card = document.getElementById(`card-${qId}`);
+    if (card) {
+        const newCard = criarQuestaoCard(mergedQ, false);
+        card.replaceWith(newCard);
+    }
+    const focoCard = document.getElementById(`foco-card-${qId}`);
+    if (focoCard) {
+        const newFoco = criarQuestaoCard(mergedQ, true);
+        focoCard.replaceWith(newFoco);
+    }
+
+    // 5. Iniciar a correção pedagógica automaticamente
+    setTimeout(() => {
+        iniciarCorrecaoPedagogica(qId);
+    }, 100);
+};
+
+window.voltarAoEditor = function(qId) {
+    // Fechar o balão pedagógico se estiver aberto
+    fecharModoCorrecao();
+
+    // Limpar flag de preview
+    window.emPreviewCuracaoId = null;
+    
+    // Abrir editor inline novamente
+    window.editarQuestaoInline(qId);
+};
+
+// Formata segundos em HH:MM:SS
+function formatarTempoHHMMSS(segundos) {
+    if (!segundos || segundos < 0) return "00:00:00";
+    const h = String(Math.floor(segundos / 3600)).padStart(2, '0');
+    const m = String(Math.floor((segundos % 3600) / 60)).padStart(2, '0');
+    const s = String(segundos % 60).padStart(2, '0');
+    return `${h}:${m}:${s}`;
+}
+
+window.renderizarEstatisticasDetalhadas = function() {
+    // 1. Tempo na Sala & Tempo Médio
+    const tempoTotalSala = progressoUsuario.tempoTotalSala || 0;
+    const statsTempoEstudo = document.getElementById("stats-tempo-estudo");
+    if (statsTempoEstudo) {
+        statsTempoEstudo.innerText = formatarTempoHHMMSS(tempoTotalSala);
+    }
+
+    const respondidas = progressoUsuario.respondidas || {};
+    const keys = Object.keys(respondidas);
+    const totalResolvidas = keys.length;
+
+    let somaTempos = 0;
+    let acertos = 0;
+    let erros = 0;
+    const temposValidos = [];
+
+    keys.forEach(k => {
+        const r = respondidas[k];
+        if (r.correta) acertos++;
+        else erros++;
+
+        const t = r.tempoGasto || 0;
+        somaTempos += t;
+        if (t > 0) {
+            temposValidos.push(t);
+        }
+    });
+
+    const taxaAcerto = totalResolvidas > 0 ? Math.round((acertos / totalResolvidas) * 100) : 0;
+    const tempoMedio = totalResolvidas > 0 ? Math.round(somaTempos / totalResolvidas) : 0;
+
+    const statsTempoMedio = document.getElementById("stats-tempo-medio");
+    if (statsTempoMedio) {
+        statsTempoMedio.innerText = `${tempoMedio}s`;
+    }
+
+    // Aproveitamento
+    const statsTaxaAcerto = document.getElementById("stats-taxa-acerto");
+    if (statsTaxaAcerto) {
+        statsTaxaAcerto.innerText = `${taxaAcerto}%`;
+    }
+    const statsNumAcertos = document.getElementById("stats-num-acertos");
+    if (statsNumAcertos) {
+        statsNumAcertos.innerText = `${acertos} acertos`;
+    }
+    const statsNumErros = document.getElementById("stats-num-erros");
+    if (statsNumErros) {
+        statsNumErros.innerText = `${erros} erros`;
+    }
+
+    // Min / Max Tempo
+    const statsMaxTempo = document.getElementById("stats-max-tempo");
+    const statsMinTempo = document.getElementById("stats-min-tempo");
+    if (temposValidos.length > 0) {
+        const maxT = Math.max(...temposValidos);
+        const minT = Math.min(...temposValidos);
+        if (statsMaxTempo) statsMaxTempo.innerText = `${maxT}s`;
+        if (statsMinTempo) statsMinTempo.innerText = `${minT}s`;
+    } else {
+        if (statsMaxTempo) statsMaxTempo.innerText = "0s";
+        if (statsMinTempo) statsMinTempo.innerText = "0s";
+    }
+
+    // 2. Agrupamentos de Subdivisão
+    const dadosBancas = {};
+    const dadosCargos = {};
+    const dadosDisciplinas = {};
+    const dadosAssuntos = {};
+
+    keys.forEach(k => {
+        const q = obterQuestaoPorId(k);
+        if (!q) return;
+
+        const r = respondidas[k];
+        const tempo = r.tempoGasto || 0;
+        const correto = !!r.correta;
+
+        // Metadados
+        const banca = q.origem_questao?.banca || "CESPE";
+        const cargo = q.origem_questao?.cargo || "Não Informado";
+        const disciplina = q.disciplina || "Geral";
+        const assunto = q.assunto || "Geral";
+
+        const updateGrupo = (grupo, chave) => {
+            if (!grupo[chave]) {
+                grupo[chave] = { acertos: 0, erros: 0, tempoTotal: 0, total: 0 };
+            }
+            grupo[chave].total++;
+            grupo[chave].tempoTotal += tempo;
+            if (correto) grupo[chave].acertos++;
+            else grupo[chave].erros++;
+        };
+
+        updateGrupo(dadosBancas, banca);
+        updateGrupo(dadosCargos, cargo);
+        updateGrupo(dadosDisciplinas, disciplina);
+        updateGrupo(dadosAssuntos, assunto);
+    });
+
+    // Função interna para preencher as tabelas no HTML
+    const renderListaCategoria = (dados, containerId) => {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        container.innerHTML = "";
+
+        const subKeys = Object.keys(dados);
+        if (subKeys.length === 0) {
+            container.innerHTML = `<div style="text-align:center; padding:15px; color:var(--text-secondary); font-size:0.82rem;">Nenhum dado de resolução registrado.</div>`;
+            return;
+        }
+
+        // Ordenar por volume de resoluções decrescente
+        subKeys.sort((a, b) => dados[b].total - dados[a].total);
+
+        subKeys.forEach(sk => {
+            const item = dados[sk];
+            const accRate = Math.round((item.acertos / item.total) * 100);
+            const avgT = Math.round(item.tempoTotal / item.total);
+
+            const row = document.createElement("div");
+            row.className = "category-stat-row";
+            row.innerHTML = `
+                <div class="category-stat-meta">
+                    <span class="category-stat-label-text" title="${sk}">${sk}</span>
+                    <span class="category-stat-count">${item.total} res. | ${accRate}% acerto</span>
+                </div>
+                <div class="category-stat-bar-container" style="margin-top: 4px;">
+                    <div class="category-stat-bar-fill" style="width: ${accRate}%; background-color: ${accRate >= 70 ? 'var(--correta)' : accRate >= 50 ? '#f59e0b' : 'var(--errada)'};"></div>
+                </div>
+                <div style="font-size: 0.72rem; color: var(--text-secondary); display:flex; justify-content:space-between; margin-top:2px;">
+                    <span>🟢 ${item.acertos} acertos | 🔴 ${item.erros} erros</span>
+                    <span>⏱️ Média: ${avgT}s</span>
+                </div>
+            `;
+            container.appendChild(row);
+        });
+    };
+
+    renderListaCategoria(dadosBancas, "stats-bancas-list");
+    renderListaCategoria(dadosCargos, "stats-cargos-list");
+    renderListaCategoria(dadosDisciplinas, "stats-disciplinas-list");
+    renderListaCategoria(dadosAssuntos, "stats-assuntos-list");
+};
+
+// ==========================================================================
+// IMPORTAÇÃO DE QUESTÕES VUNESP (PILOTO) PARA A SALA
+// ==========================================================================
+const QUESTOES_NOVAS_VUNESP = [
+    {
+        "id": "Q_VUNESP_TJSP_2025_01",
+        "numero": 1,
+        "tipo": "multipla_escolha",
+        "disciplina": "Direito Civil",
+        "assunto": "LINDB",
+        "subassunto": "",
+        "contexto": "",
+        "enunciado": "De acordo com a Lei de Introdução às Normas do Direito Brasileiro (LINDB), na interpretação das normas sobre gestão pública, serão considerados os obstáculos e as dificuldades reais do gestor e as exigências das políticas públicas a seu cargo, sem prejuízo dos direitos dos administrados. À luz dessas regras, assinale a opção correta.",
+        "imagem": "",
+        "alternativas": [
+            { "letra": "A", "texto": "A decisão que decretar a invalidação de ato, contrato, ajuste, processo ou norma administrativa deverá indicar de modo expresso suas consequências jurídicas e administrativas." },
+            { "letra": "B", "texto": "A decisão judicial poderá impor obrigações novas sem considerar as circunstâncias práticas do caso." },
+            { "letra": "C", "texto": "A invalidação do ato dispensa a análise da regularização proporcional e equânime." },
+            { "letra": "D", "texto": "Na declaração de invalidação de ato administrativo, a motivação pode ser genérica ou abstrata." },
+            { "letra": "E", "texto": "As regras de direito público aplicam-se sem qualquer ponderação de custos e benefícios." }
+        ],
+        "gabarito": "A",
+        "comentarios_professor": "",
+        "fonte_resposta": "",
+        "mnemonico": "",
+        "comentarios_alunos": [],
+        "dificuldade": "Difícil",
+        "tags": ["LINDB", "Gestão Pública"],
+        "favorita": false,
+        "errada_pelo_usuario": false,
+        "anotacoes": "",
+        "origem_questao": { "banca": "Vunesp", "orgao": "TJ-SP", "cargo": "Juiz Substituto", "ano": "2025", "prova": "191º Concurso" },
+        "origem_importacao": { "nome": "Biblioteca", "arquivo": "tjsp_juiz_2025.json", "numero_original": 1, "data_importacao": "2026-07-26T12:15:00Z" }
+    },
+    {
+        "id": "Q_VUNESP_TJSP_2023_01",
+        "numero": 1,
+        "tipo": "multipla_escolha",
+        "disciplina": "Direito Penal",
+        "assunto": "Crimes contra a Administração Pública",
+        "subassunto": "",
+        "contexto": "",
+        "enunciado": "O funcionário público que, antes de assumir a função, mas em razão dela, exige para si vantagem indevida, comete o crime de:",
+        "imagem": "",
+        "alternativas": [
+            { "letra": "A", "texto": "Concussão." },
+            { "letra": "B", "texto": "Corrupção passiva." },
+            { "letra": "C", "texto": "Prevaricação." },
+            { "letra": "D", "texto": "Peculato." },
+            { "letra": "E", "texto": "Excesso de exação." }
+        ],
+        "gabarito": "A",
+        "comentarios_professor": "",
+        "fonte_resposta": "",
+        "mnemonico": "",
+        "comentarios_alunos": [],
+        "dificuldade": "Média",
+        "tags": ["Dos Crimes", "Funcionário Público"],
+        "favorita": false,
+        "errada_pelo_usuario": false,
+        "anotacoes": "",
+        "origem_questao": { "banca": "Vunesp", "orgao": "TJ-SP", "cargo": "Juiz Substituto", "ano": "2023", "prova": "190º Concurso" },
+        "origem_importacao": { "nome": "Biblioteca", "arquivo": "tjsp_juiz_2023.json", "numero_original": 1, "data_importacao": "2026-07-26T12:15:00Z" }
+    },
+    {
+        "id": "Q_VUNESP_MPSP_2026_01",
+        "numero": 1,
+        "tipo": "multipla_escolha",
+        "disciplina": "Direito Constitucional",
+        "assunto": "Ministério Público",
+        "subassunto": "",
+        "contexto": "",
+        "enunciado": "Assinale a opção correta a respeito das funções institucionais do Ministério Público previstas na Constituição Federal de 1988:",
+        "imagem": "",
+        "alternativas": [
+            { "letra": "A", "texto": "Promover, privativamente, a ação penal pública, na forma da lei." },
+            { "letra": "B", "texto": "Exercer a representação judicial de entidades públicas de direito privado." },
+            { "letra": "C", "texto": "Exercer a advocacia pública no âmbito dos poderes estaduais." },
+            { "letra": "D", "texto": "Impedir a instauração de inquérito civil para proteção do patrimônio público." },
+            { "letra": "E", "texto": "Promover a defense de direitos individuais." }
+        ],
+        "gabarito": "A",
+        "comentarios_professor": "",
+        "fonte_resposta": "",
+        "mnemonico": "",
+        "comentarios_alunos": [],
+        "dificuldade": "Média",
+        "tags": ["MP", "Funções Institucionais"],
+        "favorita": false,
+        "errada_pelo_usuario": false,
+        "anotacoes": "",
+        "origem_questao": { "banca": "Vunesp", "orgao": "MP-SP", "cargo": "Promotor de Justiça", "ano": "2026", "prova": "96º Concurso" },
+        "origem_importacao": { "nome": "Biblioteca", "arquivo": "mpsp_promotor_2026.json", "numero_original": 1, "data_importacao": "2026-07-26T12:15:00Z" }
+    },
+    {
+        "id": "Q_VUNESP_PCSP_2023_01",
+        "numero": 1,
+        "tipo": "multipla_escolha",
+        "disciplina": "Direito Processual Penal",
+        "assunto": "Inquérito Policial",
+        "subassunto": "",
+        "contexto": "",
+        "enunciado": "O inquérito policial, instrumento de investigação de caráter administrativo, possui como característica a indisponibilidade. Isso significa que:",
+        "imagem": "",
+        "alternativas": [
+            { "letra": "A", "texto": "A autoridade policial não poderá mandar arquivar autos de inquérito." },
+            { "letra": "B", "texto": "O inquérito não pode ser iniciado de ofício pelo delegado de polícia." },
+            { "letra": "C", "texto": "A investigação deve ser mantida em sigilo absoluto para o defensor do investigado." },
+            { "letra": "D", "texto": "O Ministério Público é obrigado a oferecer denúncia com base exclusiva no inquérito." },
+            { "letra": "E", "texto": "O juiz pode requisitar o prosseguimento das investigações após a manifestação de arquivamento do MP." }
+        ],
+        "gabarito": "A",
+        "comentarios_professor": "",
+        "fonte_resposta": "",
+        "mnemonico": "",
+        "comentarios_alunos": [],
+        "dificuldade": "Difícil",
+        "tags": ["Inquérito Policial", "CPP"],
+        "favorita": false,
+        "errada_pelo_usuario": false,
+        "anotacoes": "",
+        "origem_questao": { "banca": "Vunesp", "orgao": "PC-SP", "cargo": "Delegado de Polícia", "ano": "2023", "prova": "Prova Regular" },
+        "origem_importacao": { "nome": "Biblioteca", "arquivo": "pcsp_delegado_2023.json", "numero_original": 1, "data_importacao": "2026-07-26T12:15:00Z" }
+    }
+];
+
+if (typeof BANCO_QUESTOES !== 'undefined' && Array.isArray(BANCO_QUESTOES)) {
+    QUESTOES_NOVAS_VUNESP.forEach(q => {
+        if (!BANCO_QUESTOES.some(bq => bq.id === q.id)) {
+            BANCO_QUESTOES.unshift(q);
+        }
+    });
+}
+
+/* ==========================================================================
+   MÓDULO: PLANNER DE ESTUDOS & CICLOS DE ESTUDOS (REATIVIDADE COMPLETA)
+   ========================================================================== */
+window.materiaSelecionadasPlanner = ["Direito Constitucional", "Direito Penal", "Direito Administrativo"];
+window.frequenciaSelecionadaPlanner = 3; // default: 3x na semana
+
+window.renderizarPlanner = function() {
+    const container = document.getElementById("section-planner");
+    if (!container) return;
+
+    if (!progressoUsuario.planner) {
+        progressoUsuario.planner = {
+            cicloAtivo: false,
+            emExibicaoRelatorio: false,
+            config: {},
+            progresso: { totalRealizado: 0, historicoDias: {}, questoesCiclo: [] }
+        };
+    }
+
+    const p = progressoUsuario.planner;
+
+    if (p.emExibicaoRelatorio) {
+        window.renderizarRelatorioPlanner(container);
+    } else if (!p.cicloAtivo) {
+        window.renderizarFormConfigPlanner(container);
+    } else {
+        window.renderizarDashboardCicloPlanner(container);
+    }
+};
+
+// 1. TELA DE CONFIGURAÇÃO (FORMULÁRIO DE ONBOARDING)
+window.renderizarFormConfigPlanner = function(container) {
+    const materiasDisponiveis = [
+        "Direito Administrativo",
+        "Direito Constitucional",
+        "Direito Penal",
+        "Direito Processual Penal",
+        "Direito Civil",
+        "Contabilidade Pública",
+        "Criminologia",
+        "Língua Portuguesa"
+    ];
+
+    let materiasHTML = "";
+    materiasDisponiveis.forEach(m => {
+        const checked = window.materiaSelecionadasPlanner.includes(m) ? "checked" : "";
+        const pesoId = `peso-${m.replace(/\s+/g, '-')}`;
+        materiasHTML += `
+            <div class="planner-materia-row" style="margin-bottom: 10px;">
+                <label style="font-weight: 700; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="chk-${m.replace(/\s+/g, '-')}" value="${m}" ${checked} onchange="window.toggleMateriaSelecao('${m}')">
+                    ${m}
+                </label>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 0.72rem; color: var(--text-secondary); font-weight: bold;">Peso:</span>
+                    <input type="range" id="${pesoId}" min="1" max="5" value="3" style="width: 70px; cursor: pointer;" oninput="document.getElementById('lbl-${pesoId}').innerText = this.value">
+                    <span id="lbl-${pesoId}" style="font-weight: bold; font-size: 0.8rem; min-width: 12px;">3</span>
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = `
+        <div class="planner-banner">
+            <h1 class="planner-banner-title">📅 Planner de Estudos</h1>
+            <p class="planner-banner-desc">Monte seu Ciclo de Estudos personalizado. Organize matérias, pesos e defina a sua carga horária de forma dinâmica.</p>
+        </div>
+
+        <div class="planner-grid-config">
+            <!-- Coluna 1: Metas e Frequência -->
+            <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 25px; background-color: var(--bg-card);">
+                <h2 style="font-size: 1.25rem; font-weight: 850; margin-bottom: 20px; border-bottom: 1.5px solid var(--border); padding-bottom: 10px;">⚙️ Configurações Gerais</h2>
+                
+                <!-- Objetivo -->
+                <div style="margin-bottom: 20px;">
+                    <label style="font-size: 0.85rem; font-weight: 750; color: var(--text-secondary); display: block; margin-bottom: 8px;">Objetivo Principal do Ciclo</label>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn btn-outline-primary active" id="btn-obj-horas" onclick="window.setObjetivoPlanner('horas')" style="flex:1; font-weight: 750;">⏱️ Horas de Estudo</button>
+                        <button class="btn btn-outline-primary" id="btn-obj-questoes" onclick="window.setObjetivoPlanner('questoes')" style="flex:1; font-weight: 750;">📝 Questões Resolvidas</button>
+                    </div>
+                </div>
+
+                <!-- Meta Total -->
+                <div style="margin-bottom: 20px;">
+                    <label for="metaTotalInput" id="lblMetaTotal" style="font-size: 0.85rem; font-weight: 750; color: var(--text-secondary); display: block; margin-bottom: 8px;">Meta Total: 40 horas</label>
+                    <input type="range" id="metaTotalInput" min="10" max="200" value="40" step="5" style="width: 100%; cursor: pointer;" oninput="window.atualizarLabelMetaTotal(this.value)">
+                </div>
+
+                <!-- Frequência -->
+                <div style="margin-bottom: 20px;">
+                    <label style="font-size: 0.85rem; font-weight: 750; color: var(--text-secondary); display: block; margin-bottom: 8px;">Frequência Semanal de Estudos</label>
+                    <div class="planner-freq-group">
+                        <div class="planner-freq-card ${window.frequenciaSelecionadaPlanner === 2 ? 'active' : ''}" onclick="window.setFrequenciaPlanner(2)">2x / semana</div>
+                        <div class="planner-freq-card ${window.frequenciaSelecionadaPlanner === 3 ? 'active' : ''}" onclick="window.setFrequenciaPlanner(3)">3x / semana</div>
+                        <div class="planner-freq-card ${window.frequenciaSelecionadaPlanner === 5 ? 'active' : ''}" onclick="window.setFrequenciaPlanner(5)">5x / semana</div>
+                        <div class="planner-freq-card ${window.frequenciaSelecionadaPlanner === 7 ? 'active' : ''}" onclick="window.setFrequenciaPlanner(7)">Diário (7x)</div>
+                    </div>
+                </div>
+
+                <!-- Finais de semana e Feriados -->
+                <div style="margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
+                    <label for="chkFinaisDeSemana" style="font-size: 0.88rem; font-weight: 750; color: var(--text-secondary); cursor: pointer;">Estudar Finais de Semana e Feriados?</label>
+                    <input type="checkbox" id="chkFinaisDeSemana" checked style="width: 18px; height: 18px; cursor: pointer;">
+                </div>
+
+                <!-- Carga Diária -->
+                <div style="margin-bottom: 20px;">
+                    <label for="cargaDiariaInput" id="lblCargaDiaria" style="font-size: 0.85rem; font-weight: 750; color: var(--text-secondary); display: block; margin-bottom: 8px;">Carga por Sessão: 2 horas</label>
+                    <input type="range" id="cargaDiariaInput" min="1" max="8" value="2" style="width: 100%; cursor: pointer;" oninput="document.getElementById('lblCargaDiaria').innerText = 'Carga por Sessão: ' + this.value + ' horas'">
+                </div>
+            </div>
+
+            <!-- Coluna 2: Seleção de Disciplinas -->
+            <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 25px; background-color: var(--bg-card); display: flex; flex-direction: column; justify-content: space-between;">
+                <div>
+                    <h2 style="font-size: 1.25rem; font-weight: 850; margin-bottom: 20px; border-bottom: 1.5px solid var(--border); padding-bottom: 10px;">📚 Disciplinas e Distribuição</h2>
+                    <p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 15px;">Selecione as disciplinas que deseja estudar e configure o peso de prioridade de cada uma (pesos maiores terão mais espaço no ciclo).</p>
+                    
+                    <div style="max-height: 310px; overflow-y: auto; padding-right: 8px;">
+                        ${materiasHTML}
+                    </div>
+                </div>
+
+                <div style="margin-top: 25px;">
+                    <button class="btn btn-primary" onclick="window.iniciarNovoCiclo()" style="width: 100%; padding: 14px; font-size: 1rem; font-weight: 800; border-radius: 10px; background-color: var(--accent); border-color: var(--accent); color: #fff;">
+                        🚀 Iniciar Ciclo de Estudos
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    window.setObjetivoPlanner(window.plannerObjetivo); // Garantir inicialização dos botões
+};
+
+window.plannerObjetivo = "horas";
+
+window.setObjetivoPlanner = function(obj) {
+    window.plannerObjetivo = obj;
+    const btnHoras = document.getElementById("btn-obj-horas");
+    const btnQuestoes = document.getElementById("btn-obj-questoes");
+    const sliderMeta = document.getElementById("metaTotalInput");
+
+    if (btnHoras && btnQuestoes && sliderMeta) {
+        if (obj === "horas") {
+            btnHoras.classList.add("active");
+            btnQuestoes.classList.remove("active");
+            sliderMeta.min = "10";
+            sliderMeta.max = "200";
+            sliderMeta.value = "40";
+            window.atualizarLabelMetaTotal(40);
+        } else {
+            btnHoras.classList.remove("active");
+            btnQuestoes.classList.add("active");
+            sliderMeta.min = "50";
+            sliderMeta.max = "1000";
+            sliderMeta.value = "200";
+            window.atualizarLabelMetaTotal(200);
+        }
+    }
+};
+
+window.atualizarLabelMetaTotal = function(val) {
+    const lbl = document.getElementById("lblMetaTotal");
+    if (lbl) {
+        if (window.plannerObjetivo === "horas") {
+            lbl.innerText = `Meta Total: ${val} horas`;
+        } else {
+            lbl.innerText = `Meta Total: ${val} questões`;
+        }
+    }
+};
+
+window.setFrequenciaPlanner = function(freq) {
+    window.frequenciaSelecionadaPlanner = freq;
+    // Re-renderizar o formulário
+    const container = document.getElementById("section-planner");
+    if (container) window.renderizarFormConfigPlanner(container);
+};
+
+window.toggleMateriaSelecao = function(materia) {
+    const idx = window.materiaSelecionadasPlanner.indexOf(materia);
+    if (idx >= 0) {
+        window.materiaSelecionadasPlanner.splice(idx, 1);
+    } else {
+        window.materiaSelecionadasPlanner.push(materia);
+    }
+};
+
+// 2. INICIAR NOVO CICLO
+window.iniciarNovoCiclo = function() {
+    if (window.materiaSelecionadasPlanner.length === 0) {
+        alert("Por favor, selecione ao menos uma disciplina para o ciclo!");
+        return;
+    }
+
+    const metaVal = parseInt(document.getElementById("metaTotalInput").value);
+    const cargaVal = parseInt(document.getElementById("cargaDiariaInput").value);
+    const finaisDeSemana = document.getElementById("chkFinaisDeSemana").checked;
+
+    // Coletar matérias e pesos
+    const materiasConfig = [];
+    window.materiaSelecionadasPlanner.forEach(m => {
+        const pesoEl = document.getElementById(`peso-${m.replace(/\s+/g, '-')}`);
+        const peso = pesoEl ? parseInt(pesoEl.value) : 3;
+        materiasConfig.push({ nome: m, peso: peso });
+    });
+
+    // Algoritmo de Distribuição Proporcional (Ciclo de Estudos)
+    const materiasPool = [];
+    materiasConfig.forEach(m => {
+        for (let i = 0; i < m.peso; i++) {
+            materiasPool.push(m.nome);
+        }
+    });
+
+    let poolIndex = 0;
+    const historicoDias = {};
+    const hoje = new Date();
+    const diasSemanaNomes = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+
+    for (let i = 0; i < 7; i++) {
+        const diaSimulado = new Date(hoje);
+        diaSimulado.setDate(hoje.getDate() + i);
+        const key = diaSimulado.toISOString().split('T')[0];
+
+        const diaDaSemanaIdx = diaSimulado.getDay();
+        const isFimDeSemana = (diaDaSemanaIdx === 0 || diaDaSemanaIdx === 6);
+
+        let planejado = 0;
+        let realizado = 0;
+        let materia = "";
+        let eDiaEstudo = true;
+
+        if (isFimDeSemana && !finaisDeSemana) {
+            eDiaEstudo = false;
+        } else {
+            const frequenciaMeta = window.frequenciaSelecionadaPlanner;
+            if (frequenciaMeta === 2 && (i % 3 !== 0)) eDiaEstudo = false;
+            else if (frequenciaMeta === 3 && (i % 2 !== 0)) eDiaEstudo = false;
+            else if (frequenciaMeta === 5 && (i === 3 || i === 6)) eDiaEstudo = false;
+        }
+
+        if (eDiaEstudo) {
+            materia = materiasPool[poolIndex % materiasPool.length];
+            poolIndex++;
+            if (window.plannerObjetivo === "horas") {
+                planejado = cargaVal * 60; // em minutos
+            } else {
+                planejado = Math.ceil(metaVal / 10);
+            }
+        }
+
+        historicoDias[key] = {
+            materia: materia,
+            planejado: planejado,
+            realizado: realizado,
+            concluido: false,
+            eDiaEstudo: eDiaEstudo,
+            diaNome: diasSemanaNomes[diaDaSemanaIdx]
+        };
+    }
+
+    progressoUsuario.planner = {
+        cicloAtivo: true,
+        emExibicaoRelatorio: false,
+        config: {
+            objetivo: window.plannerObjetivo,
+            metaTotal: metaVal,
+            frequencia: window.frequenciaSelecionadaPlanner,
+            finaisDeSemana: finaisDeSemana,
+            cargaDiaria: cargaVal,
+            disciplinas: materiasConfig
+        },
+        progresso: {
+            totalRealizado: 0,
+            historicoDias: historicoDias,
+            questoesCiclo: []
+        }
+    };
+
+    salvarProgressoLocal();
+    window.renderizarPlanner();
+};
+
+// 3. DASHBOARD DO CICLO ATIVO
+window.renderizarDashboardCicloPlanner = function(container) {
+    const p = progressoUsuario.planner;
+    const meta = p.config.metaTotal;
+    const realizado = p.progresso.totalRealizado || 0;
+
+    const percent = Math.min(100, Math.round((realizado / meta) * 100));
+    const hojeKey = new Date().toISOString().split('T')[0];
+
+    if (!p.progresso.historicoDias[hojeKey]) {
+        const diaDaSemanaNomes = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+        const d = new Date();
+        p.progresso.historicoDias[hojeKey] = {
+            materia: p.config.disciplinas[Math.floor(Math.random() * p.config.disciplinas.length)].nome,
+            planejado: p.config.objetivo === "horas" ? p.config.cargaDiaria * 60 : Math.ceil(meta / 10),
+            realizado: 0,
+            concluido: false,
+            eDiaEstudo: true,
+            diaNome: diaDaSemanaNomes[d.getDay()]
+        };
+    }
+
+    const diaHoje = p.progresso.historicoDias[hojeKey];
+
+    let weekHTML = "";
+    const sortedKeys = Object.keys(p.progresso.historicoDias).sort().slice(-7);
+
+    sortedKeys.forEach(k => {
+        const dia = p.progresso.historicoDias[k];
+        const isHoje = (k === hojeKey);
+        
+        let cardClass = "planner-day-card";
+        let statusText = "Pendente";
+
+        if (dia.concluido) {
+            cardClass += " completed";
+            statusText = "🟢 Concluído";
+        } else if (isHoje) {
+            cardClass += " today";
+            statusText = "⏳ Hoje";
+        } else if (!dia.eDiaEstudo) {
+            cardClass += " rest";
+            statusText = "☕ Folga";
+        }
+
+        const details = dia.eDiaEstudo 
+            ? `<div class="day-subject" title="${dia.materia}">${dia.materia.split(' ')[0]}...</div>` 
+            : `<div class="day-subject" style="color:var(--text-secondary); font-style:italic;">Descanso</div>`;
+
+        weekHTML += `
+            <div class="${cardClass}">
+                <div class="day-num">${dia.diaNome}</div>
+                ${details}
+                <div class="day-status">${statusText}</div>
+            </div>
+        `;
+    });
+
+    const displayRealizado = p.config.objetivo === "horas" 
+        ? `${Math.floor(realizado / 60)}h ${realizado % 60}m` 
+        : `${realizado} questões`;
+        
+    const displayMeta = p.config.objetivo === "horas" 
+        ? `${meta} horas` 
+        : `${meta} questões`;
+
+    let metaHojeTexto = "";
+    if (!diaHoje.eDiaEstudo) {
+        metaHojeTexto = `
+            <h3 style="font-size: 1.35rem; font-weight: 800; color: var(--text-primary); margin-bottom: 8px;">☕ Dia de Folga e Descanso</h3>
+            <p style="font-size: 0.95rem; color: var(--text-secondary);">Aproveite hoje para descansar a mente ou revisar anotações de ciclos anteriores de forma leve.</p>
+        `;
+    } else {
+        const hojeMetaText = p.config.objetivo === "horas" 
+            ? `${Math.floor(diaHoje.planejado / 60)} horas` 
+            : `${diaHoje.planejado} questões`;
+        
+        const hojeRealizadoText = p.config.objetivo === "horas" 
+            ? `${Math.floor(diaHoje.realizado)} min` 
+            : `${diaHoje.realizado} quest.`;
+
+        metaHojeTexto = `
+            <span class="meta-badge" style="background-color: var(--accent-light); color: var(--accent); font-weight: bold; margin-bottom: 12px; display: inline-block;">Foco do Dia</span>
+            <h3 style="font-size: 1.5rem; font-weight: 850; color: var(--text-primary); margin-bottom: 6px;">${diaHoje.materia}</h3>
+            <p style="font-size: 0.95rem; color: var(--text-secondary); margin-bottom: 20px;">
+                Meta de hoje: realizar <strong>${hojeMetaText}</strong> de estudos. Progresso atual: <strong>${hojeRealizadoText}</strong>
+            </p>
+            
+            <div style="display:flex; flex-wrap:wrap; gap:12px;">
+                <button class="btn btn-primary" onclick="window.resolverMetaHoje('${diaHoje.materia}')" style="font-weight: 750;">🚀 Resolver na Sala</button>
+                <button class="btn btn-outline-secondary" onclick="window.abrirModalManualPlanner()" style="font-weight: 700;">⏱️ Registrar Estudo Manual</button>
+                <button class="btn btn-outline-success" onclick="window.concluirMetaDoDia()" style="font-weight: 700;">✔️ Meta Concluída</button>
+            </div>
+        `;
+    }
+
+    container.innerHTML = `
+        <div class="planner-banner">
+            <h1 class="planner-banner-title">📅 Seu Ciclo de Estudos Ativo</h1>
+            <p class="planner-banner-desc">Mantenha a constância! Realize a meta do dia e visualize a evolução do seu cronograma.</p>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1.2fr 1fr; gap:25px; margin-bottom: 25px;">
+            <!-- Painel de Progresso Global -->
+            <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 25px; background-color: var(--bg-card); display:flex; flex-direction:column; justify-content:space-between;">
+                <div>
+                    <h2 style="font-size:1.15rem; font-weight:800; color:var(--text-primary); margin-bottom:15px;">📈 Progresso Geral do Ciclo</h2>
+                    <div style="display:flex; align-items:center; gap:20px; margin-bottom: 15px;">
+                        <div style="font-size: 2.5rem; font-weight: 900; color: var(--accent);">${percent}%</div>
+                        <div style="flex:1;">
+                            <div style="font-size: 0.88rem; color: var(--text-secondary); font-weight: bold; display:flex; justify-content:space-between; margin-bottom: 4px;">
+                                <span>${displayRealizado} concluídas</span>
+                                <span>Meta: ${displayMeta}</span>
+                            </div>
+                            <div style="height: 10px; background-color: var(--border); border-radius:5px; overflow:hidden;">
+                                <div style="width: ${percent}%; height: 100%; background: linear-gradient(90deg, var(--accent) 0%, #a855f7 100%); transition: width 0.5s ease;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display:flex; justify-content: space-between; border-top: 1.5px solid var(--border); padding-top: 15px; margin-top: 15px;">
+                    <button class="btn btn-outline-danger btn-sm" onclick="window.abandonarCiclo()" style="font-weight:700;">Abandonar Ciclo</button>
+                    <button class="btn btn-success" onclick="window.finalizarCicloEGerarRelatorio()" style="font-weight:750;">🏁 Concluir Ciclo e Ver Relatório</button>
+                </div>
+            </div>
+
+            <!-- Calendário Semanal -->
+            <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 25px; background-color: var(--bg-card);">
+                <h2 style="font-size:1.15rem; font-weight:800; color:var(--text-primary); margin-bottom:15px;">📆 Cronograma do Ciclo</h2>
+                <div class="planner-week-container">
+                    ${weekHTML}
+                </div>
+            </div>
+        </div>
+
+        <!-- Meta do Dia -->
+        <div class="planner-today-target-card">
+            ${metaHojeTexto}
+        </div>
+
+        <!-- Modal de registro manual -->
+        <div id="plannerManualModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background-color:rgba(0,0,0,0.5); z-index:9999; justify-content:center; align-items:center;">
+            <div class="card-base" style="background-color:var(--bg-card); border-radius:16px; width:350px; padding:25px; border: 2px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
+                <h3 style="font-size:1.15rem; font-weight:800; margin-bottom:15px;">⏱️ Registrar Estudo</h3>
+                <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:15px;">Quantos minutos você estudou esta disciplina hoje?</p>
+                <input type="number" id="manualMinutosInput" placeholder="Minutos (ex: 60, 120)" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); background-color:var(--bg-app); color:var(--text-primary); font-size:1rem; margin-bottom:20px;">
+                <div style="display:flex; justify-content:flex-end; gap:10px;">
+                    <button class="btn btn-outline-secondary" onclick="window.fecharModalManualPlanner()">Cancelar</button>
+                    <button class="btn btn-primary" onclick="window.salvarEstudoManual()">Confirmar</button>
+                </div>
+            </div>
+        </div>
+    `;
+};
+
+window.resolverMetaHoje = function(materia) {
+    navegarPara('questoes');
+    const filterInput = document.getElementById("searchFiltroGlobal");
+    if (filterInput) {
+        filterInput.value = materia;
+        aplicarFiltros();
+    }
+};
+
+window.abrirModalManualPlanner = function() {
+    const m = document.getElementById("plannerManualModal");
+    if (m) m.style.display = "flex";
+};
+
+window.fecharModalManualPlanner = function() {
+    const m = document.getElementById("plannerManualModal");
+    if (m) m.style.display = "none";
+};
+
+window.salvarEstudoManual = function() {
+    const input = document.getElementById("manualMinutosInput");
+    if (!input || !input.value) return;
+    const mins = parseInt(input.value);
+    
+    if (mins > 0) {
+        const p = progressoUsuario.planner;
+        const hojeKey = new Date().toISOString().split('T')[0];
+        const diaHoje = p.progresso.historicoDias[hojeKey];
+
+        if (p.config.objetivo === "horas") {
+            diaHoje.realizado += mins;
+            p.progresso.totalRealizado += mins;
+            if (diaHoje.realizado >= diaHoje.planejado) {
+                diaHoje.concluido = true;
+            }
+        } else {
+            const questaoEquivalente = Math.ceil(mins / 20);
+            diaHoje.realizado += questaoEquivalente;
+            p.progresso.totalRealizado += questaoEquivalente;
+            if (diaHoje.realizado >= diaHoje.planejado) {
+                diaHoje.concluido = true;
+            }
+        }
+
+        salvarProgressoLocal();
+        window.fecharModalManualPlanner();
+        window.renderizarPlanner();
+    }
+};
+
+window.concluirMetaDoDia = function() {
+    const p = progressoUsuario.planner;
+    const hojeKey = new Date().toISOString().split('T')[0];
+    const diaHoje = p.progresso.historicoDias[hojeKey];
+
+    if (diaHoje) {
+        diaHoje.concluido = true;
+        const diferenca = Math.max(0, diaHoje.planejado - diaHoje.realizado);
+        diaHoje.realizado = diaHoje.planejado;
+        p.progresso.totalRealizado += diferenca;
+
+        salvarProgressoLocal();
+        window.renderizarPlanner();
+    }
+};
+
+window.abandonarCiclo = function() {
+    if (confirm("Tem certeza que deseja abandonar o ciclo atual? Todo o progresso deste cronograma será resetado!")) {
+        progressoUsuario.planner = {
+            cicloAtivo: false,
+            emExibicaoRelatorio: false,
+            config: {},
+            progresso: { totalRealizado: 0, historicoDias: {}, questoesCiclo: [] }
+        };
+        salvarProgressoLocal();
+        window.renderizarPlanner();
+    }
+};
+
+// 4. RELATÓRIO DO FIM DO CICLO
+window.finalizarCicloEGerarRelatorio = function() {
+    const p = progressoUsuario.planner;
+    p.emExibicaoRelatorio = true;
+    salvarProgressoLocal();
+    window.renderizarPlanner();
+};
+
+window.renderizarRelatorioPlanner = function(container) {
+    const p = progressoUsuario.planner;
+    const meta = p.config.metaTotal;
+    const realizado = p.progresso.totalRealizado || 0;
+
+    const questoesCicloIds = p.progresso.questoesCiclo || [];
+    const totalQuestoesCiclo = questoesCicloIds.length;
+
+    let acertos = 0;
+    let erros = 0;
+    const performanceMateria = {};
+
+    questoesCicloIds.forEach(qId => {
+        const q = obterQuestaoPorId(qId);
+        const resp = progressoUsuario.respondidas[qId];
+        if (q && resp) {
+            const correta = !!resp.correta;
+            if (correta) acertos++;
+            else erros++;
+
+            const mat = q.disciplina || "Geral";
+            if (!performanceMateria[mat]) {
+                performanceMateria[mat] = { acertos: 0, total: 0 };
+            }
+            performanceMateria[mat].total++;
+            if (correta) performanceMateria[mat].acertos++;
+        }
+    });
+
+    const taxaAcerto = totalQuestoesCiclo > 0 ? Math.round((acertos / totalQuestoesCiclo) * 100) : 0;
+
+    let consultoriaHTML = "";
+    const materiasLidas = Object.keys(performanceMateria);
+    if (materiasLidas.length > 0) {
+        materiasLidas.sort((a, b) => {
+            const taxaA = (performanceMateria[a].acertos / performanceMateria[a].total);
+            const taxaB = (performanceMateria[b].acertos / performanceMateria[b].total);
+            return taxaA - taxaB;
+        });
+
+        const piorMateria = materiasLidas[0];
+        const taxaPior = Math.round((performanceMateria[piorMateria].acertos / performanceMateria[piorMateria].total) * 100);
+
+        consultoriaHTML = `
+            <div class="card-base" style="border: 2px solid var(--accent); border-radius: 16px; padding: 25px; background-color: var(--accent-light); color: var(--accent); margin-bottom: 25px;">
+                <h3 style="font-size: 1.15rem; font-weight: 850; margin-bottom: 8px;">🎓 Orientação Pedagógica REMB</h3>
+                <p style="font-size: 0.95rem; line-height: 1.5; color: var(--text-primary);">
+                    Identificamos que seu aproveitamento em <strong>${piorMateria}</strong> foi de apenas <strong>${taxaPior}%</strong> no ciclo de estudos.
+                    Para equilibrar sua performance global nas provas, sugerimos <strong>aumentar o peso</strong> desta matéria no seu próximo Ciclo de Estudos e dedicar pelo menos 30 minutos a mais de leitura de doutrina e resumos direcionados antes das sessões de Engenharia Reversa.
+                </p>
+            </div>
+        `;
+    } else {
+        consultoriaHTML = `
+            <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 25px; background-color: var(--bg-card); color: var(--text-secondary); margin-bottom: 25px; text-align: center;">
+                <h3 style="font-size: 1.1rem; font-weight: 800; margin-bottom: 8px;">🎓 Orientação Pedagógica</h3>
+                <p style="font-size: 0.9rem;">Resolva questões na sala de estudos durante o ciclo para habilitar os conselhos da inteligência de curação.</p>
+            </div>
+        `;
+    }
+
+    let tabelaHTML = "";
+    materiasLidas.forEach(mat => {
+        const item = performanceMateria[mat];
+        const rate = Math.round((item.acertos / item.total) * 100);
+        tabelaHTML += `
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1.5px solid var(--border); padding: 10px 0;">
+                <span style="font-weight: 750; font-size:0.9rem; color:var(--text-primary);">${mat}</span>
+                <span style="font-weight: bold; font-size:0.9rem; color: ${rate >= 70 ? 'var(--correta)' : 'var(--errada)'};">${rate}% de acertos (${item.total} q.)</span>
+            </div>
+        `;
+    });
+
+    if (tabelaHTML === "") {
+        tabelaHTML = `<div style="text-align:center; padding:15px; color:var(--text-secondary); font-size:0.85rem;">Nenhum dado estatístico disponível.</div>`;
+    }
+
+    const tempoConclusaoText = p.config.objetivo === "horas"
+        ? `${Math.floor(realizado / 60)}h / ${meta}h`
+        : `${realizado} / ${meta} questões`;
+
+    const percentConclusao = Math.min(100, Math.round((realizado / meta) * 100));
+
+    container.innerHTML = `
+        <div class="planner-banner">
+            <h1 class="planner-banner-title">🏁 Relatório de Conclusão do Ciclo</h1>
+            <p class="planner-banner-desc">Parabéns pelo esforço! Veja as estatísticas consolidadas do seu cronograma de estudos finalizado.</p>
+        </div>
+
+        ${consultoriaHTML}
+
+        <div class="planner-report-grid">
+            <!-- Aproveitamento Global -->
+            <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 25px; background-color: var(--bg-card);">
+                <h3 style="font-size: 1.2rem; font-weight: 850; margin-bottom: 20px; border-bottom: 1.5px solid var(--border); padding-bottom: 10px;">📈 Aproveitamento Geral</h3>
+                
+                <div style="display:flex; justify-content:space-between; margin-bottom:12px;">
+                    <span style="font-weight:700; color:var(--text-secondary);">Metas Executadas:</span>
+                    <span style="font-weight:bold; color:var(--text-primary);">${percentConclusao}% da meta batida</span>
+                </div>
+                <div style="height:10px; background-color:var(--border); border-radius:5px; overflow:hidden; margin-bottom:25px;">
+                    <div style="width:${percentConclusao}%; height:100%; background-color:var(--accent); border-radius:5px;"></div>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; margin-bottom:12px; font-size:0.9rem;">
+                    <span>Volume Planejado vs Executado:</span>
+                    <span style="font-weight:800;">${tempoConclusaoText}</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:12px; font-size:0.9rem;">
+                    <span>Taxa de Acertos Geral do Ciclo:</span>
+                    <span style="font-weight:800; color:var(--correta);">${taxaAcerto}% acerto (${totalQuestoesCiclo} res.)</span>
+                </div>
+            </div>
+
+            <!-- Detalhe por Disciplinas -->
+            <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 25px; background-color: var(--bg-card);">
+                <h3 style="font-size: 1.2rem; font-weight: 850; margin-bottom: 20px; border-bottom: 1.5px solid var(--border); padding-bottom: 10px;">📊 Desempenho por Matéria</h3>
+                <div>
+                    ${tabelaHTML}
+                </div>
+            </div>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:25px; border-top:1.5px solid var(--border); padding-top:20px;">
+            <button class="btn btn-outline-secondary" onclick="window.print()" style="font-weight:700;">🖨️ Imprimir Relatório</button>
+            <button class="btn btn-primary" onclick="window.limparRelatorioPlanner()" style="font-weight:750;">🆕 Iniciar Novo Ciclo</button>
+        </div>
+    `;
+};
+
+window.limparRelatorioPlanner = function() {
+    progressoUsuario.planner = {
+        cicloAtivo: false,
+        emExibicaoRelatorio: false,
+        config: {},
+        progresso: { totalRealizado: 0, historicoDias: {}, questoesCiclo: [] }
+    };
+    salvarProgressoLocal();
+    window.renderizarPlanner();
+};
