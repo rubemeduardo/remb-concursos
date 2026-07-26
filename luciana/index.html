@@ -21,7 +21,7 @@
     <!-- Elemento para estilo dinâmico de seleção de texto -->
     <style id="dynamic-selection-style"></style>
 </head>
-<body>
+<body class="portal-student">
 
     <!-- Topbar Mobile -->
     <div class="mobile-topbar" style="display: none;">
@@ -43,49 +43,71 @@
             <div class="sidebar-header">
                 <div class="app-logo" style="cursor: pointer;" onclick="navegarPara('dashboard')">
                     <span>🎓</span>
-                    <h2 class="logo-text">REMB <span>ESTUDOS</span></h2>
+                    <span class="logo-text">REMB <span class="logo-subtext">Estudos</span></span>
+                </div>
+                <div class="portal-selector-wrapper">
+                    <button class="portal-btn active" id="portal-btn-student" onclick="window.setPortalMode('student')">🎓 Aluno</button>
+                    <button class="portal-btn" id="portal-btn-admin" onclick="window.setPortalMode('admin')">⚙️ Admin</button>
                 </div>
             </div>
             
             <nav class="sidebar-menu">
-                <button class="menu-item active" id="btn-nav-dashboard" onclick="navegarPara('dashboard')">
+                <button class="menu-item active pedagogical-only" id="btn-nav-dashboard" onclick="navegarPara('dashboard')">
                     <span class="menu-icon">🏠</span>
                     <span class="menu-label">Início</span>
                 </button>
-                <button class="menu-item" id="btn-nav-questoes" onclick="navegarPara('questoes')">
+                <button class="menu-item pedagogical-only" id="btn-nav-questoes" onclick="navegarPara('questoes')">
                     <span class="menu-icon">✍️</span>
                     <span class="menu-label">Sala de Questões</span>
                 </button>
-                <button class="menu-item" id="btn-nav-provas" onclick="navegarPara('provas')">
+                <button class="menu-item pedagogical-only" id="btn-nav-provas" onclick="navegarPara('provas')">
                     <span class="menu-icon">📄</span>
                     <span class="menu-label">Provas</span>
                 </button>
                 
-                <button class="menu-item" id="btn-nav-caderno-erros" onclick="navegarPara('caderno-erros')">
+                <button class="menu-item pedagogical-only" id="btn-nav-caderno-erros" onclick="navegarPara('caderno-erros')">
                     <span class="menu-icon">📕</span>
                     <span class="menu-label">Caderno de Erros</span>
                     <span class="badge" id="badge-erros">0</span>
                 </button>
-                <button class="menu-item" id="btn-nav-favoritas" onclick="navegarPara('favoritas')">
+                <button class="menu-item pedagogical-only" id="btn-nav-favoritas" onclick="navegarPara('favoritas')">
                     <span class="menu-icon">⭐</span>
                     <span class="menu-label">Favoritas</span>
                     <span class="badge" id="badge-favoritas">0</span>
                 </button>
-                <button class="menu-item" id="btn-nav-minhas-notas" onclick="navegarPara('minhas-notas')">
+                <button class="menu-item pedagogical-only" id="btn-nav-minhas-notas" onclick="navegarPara('minhas-notas')">
                     <span class="menu-icon">✏️</span>
                     <span class="menu-label">Minhas Notas</span>
                 </button>
-                <button class="menu-item" id="btn-nav-estatisticas" onclick="navegarPara('estatisticas')">
+                <button class="menu-item pedagogical-only" id="btn-nav-estatisticas" onclick="navegarPara('estatisticas')">
                     <span class="menu-icon">📊</span>
                     <span class="menu-label">Estatísticas</span>
                 </button>
-                <button class="menu-item" id="btn-nav-planner" onclick="navegarPara('planner')">
+                <button class="menu-item pedagogical-only" id="btn-nav-planner" onclick="navegarPara('planner')">
                     <span class="menu-icon">📅</span>
                     <span class="menu-label">Planejamento</span>
                 </button>
-                <button class="menu-item" id="btn-nav-configuracoes" onclick="navegarPara('configuracoes')">
+                <button class="menu-item pedagogical-only" id="btn-nav-configuracoes" onclick="navegarPara('configuracoes')">
                     <span class="menu-icon">⚙️</span>
                     <span class="menu-label">Ajustes</span>
+                </button>
+                
+                <!-- MENU ADMINISTRATIVO -->
+                <button class="menu-item admin-only" id="btn-nav-admin-status" onclick="window.navegarAdminTab('geral')">
+                    <span class="menu-icon">🤖</span>
+                    <span class="menu-label">Status REMB</span>
+                </button>
+                <button class="menu-item admin-only" id="btn-nav-admin-users" onclick="window.navegarAdminTab('usuarios')">
+                    <span class="menu-icon">👥</span>
+                    <span class="menu-label">Gestão Usuários</span>
+                </button>
+                <button class="menu-item admin-only" id="btn-nav-admin-access" onclick="window.navegarAdminTab('acessos')">
+                    <span class="menu-icon">🔑</span>
+                    <span class="menu-label">Acessos & APIs</span>
+                </button>
+                <button class="menu-item admin-only" id="btn-nav-admin-finance" onclick="window.navegarAdminTab('financeiro')">
+                    <span class="menu-icon">💰</span>
+                    <span class="menu-label">Financeiro</span>
                 </button>
             </nav>
             
@@ -549,6 +571,11 @@
             <section id="section-planner" class="content-section">
                 <!-- Conteúdo renderizado de forma reativa pelo js/app.js -->
             </section>
+
+            <!-- SEÇÃO 10: PAINEL ADMINISTRATIVO (REMB) -->
+            <section id="section-admin" class="content-section">
+                <div id="admin-panel-content"></div>
+            </section>
         </main>
     </div>
 
@@ -664,6 +691,7 @@
     <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 
     <!-- JS SCRIPTS -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="../js/banco_questoes.js"></script>
     <script src="../js/questoes_cespe_tratadas.js"></script>
     <script src="../js/app.js"></script>
