@@ -21,7 +21,7 @@
     <!-- Elemento para estilo dinâmico de seleção de texto -->
     <style id="dynamic-selection-style"></style>
 </head>
-<body>
+<body class="portal-student">
 
     <!-- Topbar Mobile -->
     <div class="mobile-topbar" style="display: none;">
@@ -37,27 +37,82 @@
         
         <!-- SIDEBAR DE NAVEGAÇÃO -->
         <aside class="app-sidebar">
+            <button class="btn-collapse-sidebar" onclick="toggleSidebarCollapse()" title="Recolher/Expandir menu" id="btnCollapseSidebar">
+                <span class="icon-arrow">◀</span>
+            </button>
             <div class="sidebar-header">
-                <div class="app-logo">
+                <div class="app-logo" style="cursor: pointer;" onclick="navegarPara('dashboard')">
                     <span>🎓</span>
-                    <h2>REMB <span>ESTUDOS</span></h2>
+                    <span class="logo-text">REMB <span class="logo-subtext">Estudos</span></span>
+                </div>
+                <div class="portal-selector-wrapper">
+                    <button class="portal-btn active" id="portal-btn-student" onclick="window.setPortalMode('student')">🎓 Aluno</button>
+                    <button class="portal-btn" id="portal-btn-admin" onclick="window.setPortalMode('admin')">⚙️ Admin</button>
                 </div>
             </div>
             
             <nav class="sidebar-menu">
-                <button class="menu-item active" id="btn-nav-dashboard" onclick="navegarPara('dashboard')">
+                <button class="menu-item active pedagogical-only" id="btn-nav-dashboard" onclick="navegarPara('dashboard')">
                     <span class="menu-icon">🏠</span>
                     <span class="menu-label">Início</span>
                 </button>
-                <button class="menu-item" id="btn-nav-questoes" onclick="navegarPara('questoes')">
+                <button class="menu-item pedagogical-only" id="btn-nav-questoes" onclick="navegarPara('questoes')">
                     <span class="menu-icon">✍️</span>
                     <span class="menu-label">Sala de Questões</span>
                 </button>
+                <button class="menu-item pedagogical-only" id="btn-nav-provas" onclick="navegarPara('provas')">
+                    <span class="menu-icon">📄</span>
+                    <span class="menu-label">Provas</span>
+                </button>
+                <button class="menu-item pedagogical-only" id="btn-nav-validacao" onclick="navegarPara('validacao')">
+                    <span class="menu-icon">🧪</span>
+                    <span class="menu-label">Laboratório</span>
+                    <span class="badge bg-warning" id="badge-validacao" style="display: block; font-weight:700;">2524</span>
+                </button>
+                <button class="menu-item pedagogical-only" id="btn-nav-caderno-erros" onclick="navegarPara('caderno-erros')">
+                    <span class="menu-icon">📕</span>
+                    <span class="menu-label">Caderno de Erros</span>
+                    <span class="badge" id="badge-erros">0</span>
+                </button>
+                <button class="menu-item pedagogical-only" id="btn-nav-favoritas" onclick="navegarPara('favoritas')">
+                    <span class="menu-icon">⭐</span>
+                    <span class="menu-label">Favoritas</span>
+                    <span class="badge" id="badge-favoritas">0</span>
+                </button>
+                <button class="menu-item pedagogical-only" id="btn-nav-minhas-notas" onclick="navegarPara('minhas-notas')">
+                    <span class="menu-icon">✏️</span>
+                    <span class="menu-label">Minhas Notas</span>
+                </button>
+                <button class="menu-item pedagogical-only" id="btn-nav-estatisticas" onclick="navegarPara('estatisticas')">
+                    <span class="menu-icon">📊</span>
+                    <span class="menu-label">Estatísticas</span>
+                </button>
+                <button class="menu-item pedagogical-only" id="btn-nav-planner" onclick="navegarPara('planner')">
+                    <span class="menu-icon">📅</span>
+                    <span class="menu-label">Planejamento</span>
+                </button>
+                <button class="menu-item pedagogical-only" id="btn-nav-configuracoes" onclick="navegarPara('configuracoes')">
+                    <span class="menu-icon">⚙️</span>
+                    <span class="menu-label">Ajustes</span>
+                </button>
                 
-                
-                
-                
-                
+                <!-- MENU ADMINISTRATIVO -->
+                <button class="menu-item admin-only" id="btn-nav-admin-status" onclick="window.navegarAdminTab('geral')">
+                    <span class="menu-icon">🤖</span>
+                    <span class="menu-label">Status REMB</span>
+                </button>
+                <button class="menu-item admin-only" id="btn-nav-admin-users" onclick="window.navegarAdminTab('usuarios')">
+                    <span class="menu-icon">👥</span>
+                    <span class="menu-label">Gestão Usuários</span>
+                </button>
+                <button class="menu-item admin-only" id="btn-nav-admin-access" onclick="window.navegarAdminTab('acessos')">
+                    <span class="menu-icon">🔑</span>
+                    <span class="menu-label">Acessos & APIs</span>
+                </button>
+                <button class="menu-item admin-only" id="btn-nav-admin-finance" onclick="window.navegarAdminTab('financeiro')">
+                    <span class="menu-icon">💰</span>
+                    <span class="menu-label">Financeiro</span>
+                </button>
             </nav>
             
             <div class="sidebar-footer">
@@ -70,7 +125,7 @@
                 
                 <!-- Toggle de Tema Escuro -->
                 <button class="theme-switch-btn" onclick="toggleTheme()" id="themeToggleBtn" title="Alternar tema">
-                    🌙 Modo Escuro
+                    🌙 <span class="theme-label">Modo Escuro</span>
                 </button>
             </div>
         </aside>
@@ -189,6 +244,25 @@
                         </div>
                     </div>
                     
+                    <!-- Filtros Extras de Testes (Simulado, Relevância) -->
+                    <div class="filter-row" style="margin-top: 12px; display: flex; gap: 20px; align-items: center; background-color: var(--bg-card); padding: 12px 18px; border-radius: 8px; border: 1.5px solid var(--border);">
+                        <div class="form-check form-switch" style="display:flex; align-items:center; gap:8px;">
+                            <input class="form-check-input" type="checkbox" id="toggleModoSimulado" onchange="alternarModoSimulado()">
+                            <label class="form-check-label" for="toggleModoSimulado" style="font-weight: 700; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; gap: 5px; margin-bottom: 0;">
+                                📝 Modo Simulado (Silencioso)
+                            </label>
+                        </div>
+                        <div class="form-check form-switch" style="display:flex; align-items:center; gap:8px;">
+                            <input class="form-check-input" type="checkbox" id="toggleAssuntosCobrados" onchange="aplicarFiltros()">
+                            <label class="form-check-label" for="toggleAssuntosCobrados" style="font-weight: 700; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; gap: 5px; margin-bottom: 0;">
+                                🔥 Apenas Assuntos Mais Cobrados
+                            </label>
+                        </div>
+                        <button class="btn btn-primary btn-sm" id="btnFinalizarSimulado" onclick="finalizarSimulado()" style="display: none; margin-left: auto; border-radius: 8px; font-weight: 600; box-shadow: 2px 2px 0px #000; border: 1.5px solid #000;">
+                            🏁 Finalizar Simulado
+                        </button>
+                    </div>
+                    
                     <!-- Busca Avançada por Tags (Estilo Tags-Input) -->
                     <div class="filter-row search-row">
                         <div class="tags-input-container">
@@ -305,12 +379,206 @@
                 </div>
                 
                 <div class="config-card">
+                    <h3>💡 Intensidade dos Marcadores de Texto</h3>
+                    <p>Ajuste o nível de transparência das cores dos grifos no enunciado (entre 15% e 75%).</p>
+                    <div style="display:flex; align-items:center; gap:15px; margin-top:10px;">
+                        <input type="range" id="opacitySlider" min="15" max="75" value="45" oninput="alterarOpacidadeGrifos(this.value)" style="flex:1; cursor:pointer;">
+                        <span id="opacityDisplay" style="font-weight:700; width:45px; text-align:right;">45%</span>
+                    </div>
+                </div>
+
+                <div class="config-card" style="margin-top:20px;">
+                    <h3>👁️ Estudo Ativo: Revelar Incorreção</h3>
+                    <p>Ao ativar, você pode passar o mouse sobre os termos incorretos tachados para ver a correção detalhada.</p>
+                    <div class="form-check form-switch" style="margin-top:10px; display:flex; align-items:center; gap:8px;">
+                        <input class="form-check-input" type="checkbox" id="toggleHoverCorretivo" onchange="alternarHoverCorretivo(this.checked)" checked style="cursor:pointer;">
+                        <label class="form-check-label" for="toggleHoverCorretivo" style="font-weight:600; cursor:pointer; margin-bottom:0;">Revelar termos corretos no hover</label>
+                    </div>
+                </div>
+
+                <div class="config-card" style="margin-top:20px;">
                     <h3>🗑️ Limpar Progresso e Histórico</h3>
                     <p>Isso apagará todo o seu progresso de acertos/erros, anotações de fóruns e favoritos salvos localmente neste navegador.</p>
                     <button class="btn-danger" onclick="resetarDadosGerais()">
                         Limpar Todos os Dados
                     </button>
                 </div>
+            </section>
+
+            <!-- SEÇÃO 8: BIBLIOTECA DE PROVAS -->
+            <section id="section-provas" class="content-section">
+                <!-- Banner Premium -->
+                <div class="prova-banner">
+                    <h1 class="prova-banner-title">📄 Biblioteca de Provas</h1>
+                    <p class="prova-banner-desc">Explore o repositório de cadernos de provas aplicados desde 2016 pelas principais bancas e impulsione seus estudos por Engenharia Reversa.</p>
+                </div>
+
+                <!-- Painel de Estatísticas / Resumo das Provas -->
+                <div class="prova-stats-row">
+                    <div class="prova-stat-card" onclick="selecionarBancaTab('todas')" title="Ver todas as provas">
+                        <span style="font-size:1.6rem;">📚</span>
+                        <div>
+                            <div class="prova-stat-number" id="stats-total-provas">37</div>
+                            <div class="prova-stat-label">Total Provas</div>
+                        </div>
+                    </div>
+                    <div class="prova-stat-card" onclick="selecionarBancaTab('Cebraspe')" title="Ver provas do Cebraspe">
+                        <span style="font-size:1.6rem; color:#3b82f6;">🔵</span>
+                        <div>
+                            <div class="prova-stat-number">11</div>
+                            <div class="prova-stat-label">Cebraspe</div>
+                        </div>
+                    </div>
+                    <div class="prova-stat-card" onclick="selecionarBancaTab('FGV')" title="Ver provas da FGV">
+                        <span style="font-size:1.6rem; color:#f59e0b;">🟡</span>
+                        <div>
+                            <div class="prova-stat-number">11</div>
+                            <div class="prova-stat-label">FGV</div>
+                        </div>
+                    </div>
+                    <div class="prova-stat-card" onclick="selecionarBancaTab('Cesgranrio')" title="Ver provas da Cesgranrio">
+                        <span style="font-size:1.6rem; color:#10b981;">🟢</span>
+                        <div>
+                            <div class="prova-stat-number">9</div>
+                            <div class="prova-stat-label">Cesgranrio</div>
+                        </div>
+                    </div>
+                    <div class="prova-stat-card" onclick="selecionarBancaTab('FCC')" title="Ver provas da FCC">
+                        <span style="font-size:1.6rem; color:#ec4899;">💗</span>
+                        <div>
+                            <div class="prova-stat-number">8</div>
+                            <div class="prova-stat-label">FCC</div>
+                        </div>
+                    </div>
+                    <div class="prova-stat-card" onclick="selecionarBancaTab('Vunesp')" title="Ver provas da Vunesp">
+                        <span style="font-size:1.6rem; color:#a855f7;">🟣</span>
+                        <div>
+                            <div class="prova-stat-number" id="stats-vunesp-number">9</div>
+                            <div class="prova-stat-label">Vunesp</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Abas Rápidas de Bancas (Tabs) -->
+                <div class="banca-tabs" id="bancaTabsWrapper">
+                    <button class="banca-tab active" data-banca="todas" onclick="selecionarBancaTab('todas')">Todas as Bancas</button>
+                    <button class="banca-tab" data-banca="Cebraspe" onclick="selecionarBancaTab('Cebraspe')">Cebraspe (CESPE)</button>
+                    <button class="banca-tab" data-banca="FGV" onclick="selecionarBancaTab('FGV')">FGV</button>
+                    <button class="banca-tab" data-banca="Cesgranrio" onclick="selecionarBancaTab('Cesgranrio')">Cesgranrio</button>
+                    <button class="banca-tab" data-banca="FCC" onclick="selecionarBancaTab('FCC')">FCC</button>
+                    <button class="banca-tab" data-banca="Vunesp" onclick="selecionarBancaTab('Vunesp')">Vunesp</button>
+                </div>
+
+                <!-- Linha secundária de Filtros (Ano e Busca) -->
+                <div class="filtros-container card-base" style="margin-bottom: 25px; padding: 15px; display: flex; flex-wrap: wrap; gap: 15px; align-items: center; border: 1.5px solid var(--border); border-radius: 12px; background-color: var(--bg-card);">
+                    <div style="flex: 1; min-width: 150px; display: flex; flex-direction: column; gap: 4px;">
+                        <label for="filterAnoProvas" style="font-size: 0.78rem; font-weight: 700; color: var(--text-secondary);">Ano de Aplicação</label>
+                        <select id="filterAnoProvas" onchange="aplicarFiltrosProvas()" style="width: 100%; padding: 8px; border-radius: 8px; border: 1.5px solid var(--border); background-color: var(--bg-app); color: var(--text-primary); cursor: pointer; font-size: 0.88rem;">
+                            <option value="todos">Todos os Anos</option>
+                            <option value="2026">2026</option>
+                            <option value="2025">2025</option>
+                            <option value="2024">2024</option>
+                            <option value="2023">2023</option>
+                            <option value="2022">2022</option>
+                            <option value="2021">2021</option>
+                            <option value="2020">2020</option>
+                            <option value="2018">2018</option>
+                            <option value="2017">2017</option>
+                            <option value="2016">2016</option>
+                        </select>
+                    </div>
+                    <div style="flex: 3; min-width: 250px; display: flex; flex-direction: column; gap: 4px;">
+                        <label for="searchProva" style="font-size: 0.78rem; font-weight: 700; color: var(--text-secondary);">Busca Textual</label>
+                        <input type="text" id="searchProva" oninput="aplicarFiltrosProvas()" placeholder="Pesquise por órgão, cargo, ano..." style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid var(--border); background-color: var(--bg-app); color: var(--text-primary); font-size: 0.88rem;">
+                    </div>
+                </div>
+
+                <!-- Grid de Provas -->
+                <div class="row g-4" id="provasGridContainer" style="display: flex; flex-wrap: wrap; gap: 20px;">
+                    <!-- Inserido dinamicamente via JS -->
+                </div>
+            </section>
+
+            <!-- SEÇÃO 9: ESTATÍSTICAS DETALHADAS -->
+            <section id="section-estatisticas" class="content-section">
+                <!-- Banner Premium -->
+                <div class="prova-banner" style="background: linear-gradient(135deg, #8b5cf6 0%, var(--accent) 100%); box-shadow: 0 8px 30px rgba(139, 92, 246, 0.15); border: none;">
+                    <h1 class="prova-banner-title">📊 Painel de Performance</h1>
+                    <p class="prova-banner-desc">Analise suas métricas de resolução, tempos gastos e o mapeamento detalhado por disciplinas, assuntos e bancas.</p>
+                </div>
+
+                <!-- Grid de Métricas Gerais -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px;">
+                    <!-- Tempo na Sala -->
+                    <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 20px; text-align: center; background-color: var(--bg-card);">
+                        <span style="font-size: 2.2rem; display: block; margin-bottom: 8px;">⏱️</span>
+                        <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Tempo de Estudo</div>
+                        <div style="font-size: 1.7rem; font-weight: 850; color: var(--text-primary);" id="stats-tempo-estudo">00:00:00</div>
+                    </div>
+                    <!-- Tempo Médio -->
+                    <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 20px; text-align: center; background-color: var(--bg-card);">
+                        <span style="font-size: 2.2rem; display: block; margin-bottom: 8px;">⏳</span>
+                        <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Tempo Médio por Questão</div>
+                        <div style="font-size: 1.7rem; font-weight: 850; color: var(--text-primary);" id="stats-tempo-medio">0s</div>
+                    </div>
+                    <!-- Maior / Menor Tempo -->
+                    <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 20px; text-align: center; background-color: var(--bg-card);">
+                        <span style="font-size: 2.2rem; display: block; margin-bottom: 8px;">🚀</span>
+                        <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Maior / Menor Tempo</div>
+                        <div style="font-size: 1.25rem; font-weight: 850; color: var(--text-primary); display: flex; justify-content: center; gap: 10px; margin-top: 4px;" id="stats-min-max-tempo">
+                            <span style="color: var(--errada);" title="Maior Tempo" id="stats-max-tempo">0s</span>
+                            <span style="color: var(--text-secondary);">/</span>
+                            <span style="color: var(--correta);" title="Menor Tempo" id="stats-min-tempo">0s</span>
+                        </div>
+                    </div>
+                    <!-- Resolvidas / Acertos / Erros -->
+                    <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 20px; text-align: center; background-color: var(--bg-card);">
+                        <span style="font-size: 2.2rem; display: block; margin-bottom: 8px;">🎯</span>
+                        <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Aproveitamento</div>
+                        <div style="font-size: 1.6rem; font-weight: 850; color: var(--text-primary);" id="stats-taxa-acerto">0%</div>
+                        <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 4px;">
+                            <span style="color: var(--correta); font-weight: 700;" id="stats-num-acertos">0 acertos</span> | 
+                            <span style="color: var(--errada); font-weight: 700;" id="stats-num-erros">0 erros</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detalhes por Categorias -->
+                <div class="stats-details-grid">
+                    <!-- Bancas -->
+                    <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 20px; background-color: var(--bg-card);">
+                        <h3 style="font-size: 1.1rem; font-weight: 800; margin-bottom: 15px;">🏛️ Performance por Banca</h3>
+                        <div id="stats-bancas-list" style="display: flex; flex-direction: column; gap: 12px;"></div>
+                    </div>
+
+                    <!-- Cargos -->
+                    <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 20px; background-color: var(--bg-card);">
+                        <h3 style="font-size: 1.1rem; font-weight: 800; margin-bottom: 15px;">💼 Performance por Cargo</h3>
+                        <div id="stats-cargos-list" style="display: flex; flex-direction: column; gap: 12px;"></div>
+                    </div>
+
+                    <!-- Disciplinas -->
+                    <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 20px; background-color: var(--bg-card);">
+                        <h3 style="font-size: 1.1rem; font-weight: 800; margin-bottom: 15px;">📚 Performance por Disciplina</h3>
+                        <div id="stats-disciplinas-list" style="display: flex; flex-direction: column; gap: 12px;"></div>
+                    </div>
+
+                    <!-- Assuntos -->
+                    <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 20px; background-color: var(--bg-card);">
+                        <h3 style="font-size: 1.1rem; font-weight: 800; margin-bottom: 15px;">🏷️ Performance por Assunto</h3>
+                        <div id="stats-assuntos-list" style="display: flex; flex-direction: column; gap: 12px;"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SEÇÃO 9: PLANNER & CICLOS DE ESTUDO -->
+            <section id="section-planner" class="content-section">
+                <!-- Conteúdo renderizado de forma reativa pelo js/app.js -->
+            </section>
+
+            <!-- SEÇÃO 10: PAINEL ADMINISTRATIVO (REMB) -->
+            <section id="section-admin" class="content-section">
+                <div id="admin-panel-content"></div>
             </section>
         </main>
     </div>
@@ -360,13 +628,42 @@
     <!-- BARRA MÓVEL DE MARCAÇÃO FLUTUANTE ARRASTÁVEL (STICKY HIGHLIGHTER) -->
     <div class="sticky-highlighter-bar" id="stickyHighlighterBar">
         <div class="highlighter-drag-handle" id="highlighterDragHandle" title="Clique e arraste para reposicionar a barra">⋮⋮</div>
-        <div class="highlighter-title">🖍️ Caneta</div>
-        <button class="highlighter-color btn-amarelo active" onclick="setCanetaAtiva('yellow', this)" title="Amarelo: Palavras-chave / Restrições / Exceções"></button>
-        <button class="highlighter-color btn-verde" onclick="setCanetaAtiva('green', this)" title="Verde: Comando da Questão (Ação)"></button>
-        <button class="highlighter-color btn-azul" onclick="setCanetaAtiva('blue', this)" title="Azul: Normas e Leis (Artigos, Resoluções)"></button>
-        <button class="highlighter-color btn-rosa" onclick="setCanetaAtiva('pink', this)" title="Rosa: Datas, Prazos e Períodos temporais"></button>
-        <button class="highlighter-color btn-laranja" onclick="setCanetaAtiva('orange', this)" title="Laranja: Situação Fática / Fatos Relevantes"></button>
-        <button class="highlighter-eraser" onclick="setCanetaAtiva('eraser', this)" title="Borracha (Apagar trechos selecionados)"></button>
+        <div class="highlighter-title" style="margin-bottom: 4px;">🖍️ Caneta</div>
+        
+        <div class="highlighter-body-wrapper" style="display: flex; flex-direction: row; gap: 12px; align-items: stretch; width: 100%;">
+            <!-- Lado esquerdo: botões de cores -->
+            <div class="highlighter-colors-column" style="display: flex; flex-direction: column; gap: 10px; align-items: center;">
+                <button class="highlighter-color btn-amarelo active" onmousedown="event.preventDefault()" onclick="setCanetaAtiva('yellow', this)" title="Amarelo: Palavras-chave / Restrições / Exceções"></button>
+                <button class="highlighter-color btn-verde" onmousedown="event.preventDefault()" onclick="setCanetaAtiva('green', this)" title="Verde: Comando da Questão (Ação)"></button>
+                <button class="highlighter-color btn-azul" onmousedown="event.preventDefault()" onclick="setCanetaAtiva('blue', this)" title="Azul: Normas e Leis (Artigos, Resoluções)"></button>
+                <button class="highlighter-color btn-rosa" onmousedown="event.preventDefault()" onclick="setCanetaAtiva('pink', this)" title="Rosa: Datas, Prazos e Períodos temporais"></button>
+                <button class="highlighter-color btn-laranja" onmousedown="event.preventDefault()" onclick="setCanetaAtiva('orange', this)" title="Laranja: Situação Fática / Fatos Relevantes"></button>
+                <button class="highlighter-eraser" onmousedown="event.preventDefault()" onclick="setCanetaAtiva('eraser', this)" title="Borracha (Apagar trechos selecionados)"></button>
+            </div>
+            
+            <!-- Linha vertical divisória -->
+            <div class="highlighter-divider" style="width: 1.5px; background-color: var(--border); margin: 0 2px;"></div>
+            
+            <!-- Lado direito: Controle vertical de opacidade/tonalidade -->
+            <div class="highlighter-opacity-control" style="display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 4px 0; position: relative;">
+                <span style="font-size: 0.65rem; font-weight: 800; color: var(--text-secondary); cursor: default; user-select: none;" title="Tonalidade Forte">➕</span>
+                
+                <div class="vertical-slider-container" id="verticalOpacitySliderContainer" onmousedown="event.preventDefault()" style="height: 140px; width: 22px; position: relative; display: flex; justify-content: center; align-items: center; cursor: pointer;" title="Arraste para ajustar a opacidade da caneta">
+                    <!-- A linha vertical de trilha -->
+                    <div class="vertical-slider-track" style="position: absolute; width: 4px; height: 100%; background-color: var(--border); border-radius: 2px;"></div>
+                    <!-- Preenchimento dinâmico -->
+                    <div class="vertical-slider-fill" id="highlighterOpacityFill" style="position: absolute; bottom: 0; width: 4px; height: 50%; background-color: var(--accent); border-radius: 2px;"></div>
+                    <!-- O botão/alça (handle) do slider -->
+                    <div class="vertical-slider-handle" id="highlighterOpacityHandle" style="position: absolute; bottom: calc(50% - 8px); width: 14px; height: 14px; border-radius: 50%; background-color: #ffffff; border: 2.5px solid #000000; box-shadow: 0 2px 4px rgba(0,0,0,0.15); z-index: 2;"></div>
+                </div>
+                
+                <span style="font-size: 0.65rem; font-weight: 800; color: var(--text-secondary); cursor: default; user-select: none;" title="Tonalidade Fraca">➖</span>
+            </div>
+        </div>
+        <!-- Dica Semântica Flutuante -->
+        <div id="highlighterSemanticTip" style="font-size: 0.62rem; font-weight: 700; color: var(--text-secondary); text-align: center; border-top: 1.5px solid var(--border); padding-top: 8px; margin-top: 4px; width: 100%; max-width: 100px; line-height: 1.25; user-select: none; cursor: default;">
+            Selecione uma Caneta
+        </div>
     </div>
 
     <!-- BOTÃO FLUTUANTE PARA SAIR DO MODO CORREÇÃO -->
@@ -398,7 +695,9 @@
     <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 
     <!-- JS SCRIPTS -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="js/banco_questoes.js"></script>
+    <script src="js/questoes_cespe_tratadas.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>
