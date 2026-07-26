@@ -22,7 +22,10 @@ let progressoUsuario = {
     comentariosForum: {},// { questionId: [ {usuario, data, texto} ] }
     baloesSalvos: {},    // { questionId: [ "texto do balao 1", ... ] }
     tagsCustomizadas: {},// { questionId: [ "minha tag", ... ] }
-    planner: { cicloAtivo: false, config: {}, progresso: { totalRealizado: 0, historicoDias: {}, questoesCiclo: [] } }
+    planner: { cicloAtivo: false, config: {}, progresso: { totalRealizado: 0, historicoDias: {}, questoesCiclo: [] } },
+    weeklyTemplate: null,
+    overrideDays: {},
+    plannerHistory: []
 };
 
 // Dados para o Modo Correção
@@ -375,6 +378,32 @@ function carregarConfiguracoesLocais() {
     if (dadosSalvos) {
         try {
             const parsed = JSON.parse(dadosSalvos);
+            const defaultWeeklyTemplate = {
+                0: Array(24).fill('empty'), // Seg
+                1: Array(24).fill('empty'), // Ter
+                2: Array(24).fill('empty'), // Qua
+                3: Array(24).fill('empty'), // Qui
+                4: Array(24).fill('empty'), // Sex
+                5: Array(24).fill('empty'), // Sáb
+                6: Array(24).fill('empty')  // Dom
+            };
+            for (let day = 0; day < 5; day++) {
+                for (let h = 0; h <= 6; h++) defaultWeeklyTemplate[day][h] = 'rest';
+                defaultWeeklyTemplate[day][23] = 'rest';
+                for (let h = 8; h <= 11; h++) defaultWeeklyTemplate[day][h] = 'work';
+                for (let h = 13; h <= 16; h++) defaultWeeklyTemplate[day][h] = 'work';
+                if (day === 0 || day === 2 || day === 4) {
+                    defaultWeeklyTemplate[day][18] = 'gym';
+                    defaultWeeklyTemplate[day][19] = 'gym';
+                } else {
+                    defaultWeeklyTemplate[day][18] = 'random';
+                }
+            }
+            for (let day = 5; day <= 6; day++) {
+                for (let h = 0; h <= 7; h++) defaultWeeklyTemplate[day][h] = 'rest';
+                for (let h = 22; h <= 23; h++) defaultWeeklyTemplate[day][h] = 'rest';
+            }
+
             progressoUsuario = {
                 respondidas: parsed.respondidas || {},
                 riscadas: parsed.riscadas || {},
@@ -385,7 +414,10 @@ function carregarConfiguracoesLocais() {
                 tagsCustomizadas: parsed.tagsCustomizadas || {},
                 curacaoVal: parsed.curacaoVal || {},
                 questoesLaboratorioAdicionais: parsed.questoesLaboratorioAdicionais || [],
-                planner: parsed.planner || { cicloAtivo: false, config: {}, progresso: { totalRealizado: 0, historicoDias: {}, questoesCiclo: [] } }
+                planner: parsed.planner || { cicloAtivo: false, config: {}, progresso: { totalRealizado: 0, historicoDias: {}, questoesCiclo: [] } },
+                weeklyTemplate: parsed.weeklyTemplate || defaultWeeklyTemplate,
+                overrideDays: parsed.overrideDays || {},
+                plannerHistory: parsed.plannerHistory || []
             };
 
             // Injetar questões copiadas da sala ao array global do laboratório
@@ -491,6 +523,8 @@ function navegarPara(sectionId) {
         renderizarFavoritas();
     } else if (sectionId === 'minhas-notas') {
         renderizarMinhasNotas();
+    } else if (sectionId === 'admin') {
+        window.renderizarAdminPanel();
     }
     
     atualizarBadgesMenu();
@@ -4457,13 +4491,24 @@ if (typeof BANCO_QUESTOES !== 'undefined' && Array.isArray(BANCO_QUESTOES)) {
 /* ==========================================================================
    MÓDULO: PLANNER DE ESTUDOS & CICLOS DE ESTUDOS (REATIVIDADE COMPLETA)
    ========================================================================== */
+
+// Variáveis Globais de Controle de Aba e Grade
+window.plannerSubTabAtiva = 'ciclo'; // 'ciclo' | 'horarios' | 'acompanhamento'
+window.currentDayIndexPlanner = 0;   // 0 (Seg) a 6 (Dom)
+window.legendTypePlanner = 'empty';  // pincel ativo
+window.dragMouseDownPlanner = false;
+
 window.materiaSelecionadasPlanner = ["Direito Constitucional", "Direito Penal", "Direito Administrativo"];
 window.frequenciaSelecionadaPlanner = 3; // default: 3x na semana
+window.plannerObjetivo = "horas";
 
-window.renderizarPlanner = function() {
-    const container = document.getElementById("section-planner");
-    if (!container) return;
+// Listener global para o arrastar da grade
+document.addEventListener('mouseup', () => {
+    window.dragMouseDownPlanner = false;
+});
 
+// Garante que o template e variáveis persistentes existam no estado do usuário
+function verificarEstruturaEstadoPlanner() {
     if (!progressoUsuario.planner) {
         progressoUsuario.planner = {
             cicloAtivo: false,
@@ -4472,19 +4517,84 @@ window.renderizarPlanner = function() {
             progresso: { totalRealizado: 0, historicoDias: {}, questoesCiclo: [] }
         };
     }
+    const defaultWeeklyTemplate = {
+        0: Array(24).fill('empty'), // Seg
+        1: Array(24).fill('empty'),
+        2: Array(24).fill('empty'),
+        3: Array(24).fill('empty'),
+        4: Array(24).fill('empty'),
+        5: Array(24).fill('empty'),
+        6: Array(24).fill('empty')  // Dom
+    };
+    for (let day = 0; day < 5; day++) {
+        for (let h = 0; h <= 6; h++) defaultWeeklyTemplate[day][h] = 'rest';
+        defaultWeeklyTemplate[day][23] = 'rest';
+        for (let h = 8; h <= 11; h++) defaultWeeklyTemplate[day][h] = 'work';
+        for (let h = 13; h <= 16; h++) defaultWeeklyTemplate[day][h] = 'work';
+        if (day === 0 || day === 2 || day === 4) {
+            defaultWeeklyTemplate[day][18] = 'gym';
+            defaultWeeklyTemplate[day][19] = 'gym';
+        } else {
+            defaultWeeklyTemplate[day][18] = 'random';
+        }
+    }
+    for (let day = 5; day <= 6; day++) {
+        for (let h = 0; h <= 7; h++) defaultWeeklyTemplate[day][h] = 'rest';
+        for (let h = 22; h <= 23; h++) defaultWeeklyTemplate[day][h] = 'rest';
+    }
 
+    if (!progressoUsuario.weeklyTemplate) {
+        progressoUsuario.weeklyTemplate = defaultWeeklyTemplate;
+    }
+    if (!progressoUsuario.overrideDays) {
+        progressoUsuario.overrideDays = {};
+    }
+    if (!progressoUsuario.plannerHistory) {
+        progressoUsuario.plannerHistory = [];
+    }
+}
+
+// 0. CONTROLADOR DE NAVEGAÇÃO DE SUB-ABAS
+window.renderizarPlanner = function() {
+    const container = document.getElementById("section-planner");
+    if (!container) return;
+
+    verificarEstruturaEstadoPlanner();
+
+    // Injetar cabeçalho de sub-abas e contêiner dinâmico
+    container.innerHTML = `
+        <div class="planner-subtabs">
+            <button class="planner-subtab ${window.plannerSubTabAtiva === 'ciclo' ? 'active' : ''}" onclick="window.renderizarSubTabPlanner('ciclo')">📅 Ciclo de Estudos</button>
+            <button class="planner-subtab ${window.plannerSubTabAtiva === 'horarios' ? 'active' : ''}" onclick="window.renderizarSubTabPlanner('horarios')">🕒 Quadro de Horários</button>
+            <button class="planner-subtab ${window.plannerSubTabAtiva === 'acompanhamento' ? 'active' : ''}" onclick="window.renderizarSubTabPlanner('acompanhamento')">📈 Acompanhamento & Metas</button>
+        </div>
+        <div id="planner-subtab-content"></div>
+    `;
+
+    const subContainer = document.getElementById("planner-subtab-content");
     const p = progressoUsuario.planner;
 
-    if (p.emExibicaoRelatorio) {
-        window.renderizarRelatorioPlanner(container);
-    } else if (!p.cicloAtivo) {
-        window.renderizarFormConfigPlanner(container);
-    } else {
-        window.renderizarDashboardCicloPlanner(container);
+    if (window.plannerSubTabAtiva === 'ciclo') {
+        if (p.emExibicaoRelatorio) {
+            window.renderizarRelatorioPlanner(subContainer);
+        } else if (!p.cicloAtivo) {
+            window.renderizarFormConfigPlanner(subContainer);
+        } else {
+            window.renderizarDashboardCicloPlanner(subContainer);
+        }
+    } else if (window.plannerSubTabAtiva === 'horarios') {
+        window.renderizarQuadroHorarios(subContainer);
+    } else if (window.plannerSubTabAtiva === 'acompanhamento') {
+        window.renderizarAcompanhamentoMetas(subContainer);
     }
 };
 
-// 1. TELA DE CONFIGURAÇÃO (FORMULÁRIO DE ONBOARDING)
+window.renderizarSubTabPlanner = function(tabName) {
+    window.plannerSubTabAtiva = tabName;
+    window.renderizarPlanner();
+};
+
+// 1. SUB-ABA 1: ONBOARDING CONFIG
 window.renderizarFormConfigPlanner = function(container) {
     const materiasDisponiveis = [
         "Direito Administrativo",
@@ -4503,14 +4613,14 @@ window.renderizarFormConfigPlanner = function(container) {
         const pesoId = `peso-${m.replace(/\s+/g, '-')}`;
         materiasHTML += `
             <div class="planner-materia-row" style="margin-bottom: 10px;">
-                <label style="font-weight: 700; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                <label style="font-weight: 700; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--text-primary);">
                     <input type="checkbox" id="chk-${m.replace(/\s+/g, '-')}" value="${m}" ${checked} onchange="window.toggleMateriaSelecao('${m}')">
                     ${m}
                 </label>
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <span style="font-size: 0.72rem; color: var(--text-secondary); font-weight: bold;">Peso:</span>
                     <input type="range" id="${pesoId}" min="1" max="5" value="3" style="width: 70px; cursor: pointer;" oninput="document.getElementById('lbl-${pesoId}').innerText = this.value">
-                    <span id="lbl-${pesoId}" style="font-weight: bold; font-size: 0.8rem; min-width: 12px;">3</span>
+                    <span id="lbl-${pesoId}" style="font-weight: bold; font-size: 0.8rem; min-width: 12px; color: var(--text-primary);">3</span>
                 </div>
             </div>
         `;
@@ -4525,7 +4635,7 @@ window.renderizarFormConfigPlanner = function(container) {
         <div class="planner-grid-config">
             <!-- Coluna 1: Metas e Frequência -->
             <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 25px; background-color: var(--bg-card);">
-                <h2 style="font-size: 1.25rem; font-weight: 850; margin-bottom: 20px; border-bottom: 1.5px solid var(--border); padding-bottom: 10px;">⚙️ Configurações Gerais</h2>
+                <h2 style="font-size: 1.25rem; font-weight: 850; margin-bottom: 20px; border-bottom: 1.5px solid var(--border); padding-bottom: 10px; color: var(--text-primary);">⚙️ Configurações Gerais</h2>
                 
                 <!-- Objetivo -->
                 <div style="margin-bottom: 20px;">
@@ -4569,7 +4679,7 @@ window.renderizarFormConfigPlanner = function(container) {
             <!-- Coluna 2: Seleção de Disciplinas -->
             <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 25px; background-color: var(--bg-card); display: flex; flex-direction: column; justify-content: space-between;">
                 <div>
-                    <h2 style="font-size: 1.25rem; font-weight: 850; margin-bottom: 20px; border-bottom: 1.5px solid var(--border); padding-bottom: 10px;">📚 Disciplinas e Distribuição</h2>
+                    <h2 style="font-size: 1.25rem; font-weight: 850; margin-bottom: 20px; border-bottom: 1.5px solid var(--border); padding-bottom: 10px; color: var(--text-primary);">📚 Disciplinas e Distribuição</h2>
                     <p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 15px;">Selecione as disciplinas que deseja estudar e configure o peso de prioridade de cada uma (pesos maiores terão mais espaço no ciclo).</p>
                     
                     <div style="max-height: 310px; overflow-y: auto; padding-right: 8px;">
@@ -4585,10 +4695,8 @@ window.renderizarFormConfigPlanner = function(container) {
             </div>
         </div>
     `;
-    window.setObjetivoPlanner(window.plannerObjetivo); // Garantir inicialização dos botões
+    window.setObjetivoPlanner(window.plannerObjetivo);
 };
-
-window.plannerObjetivo = "horas";
 
 window.setObjetivoPlanner = function(obj) {
     window.plannerObjetivo = obj;
@@ -4628,8 +4736,7 @@ window.atualizarLabelMetaTotal = function(val) {
 
 window.setFrequenciaPlanner = function(freq) {
     window.frequenciaSelecionadaPlanner = freq;
-    // Re-renderizar o formulário
-    const container = document.getElementById("section-planner");
+    const container = document.getElementById("planner-subtab-content");
     if (container) window.renderizarFormConfigPlanner(container);
 };
 
@@ -4642,7 +4749,7 @@ window.toggleMateriaSelecao = function(materia) {
     }
 };
 
-// 2. INICIAR NOVO CICLO
+// 2. TELA DE CONFIGURAÇÃO: INICIAR CICLO
 window.iniciarNovoCiclo = function() {
     if (window.materiaSelecionadasPlanner.length === 0) {
         alert("Por favor, selecione ao menos uma disciplina para o ciclo!");
@@ -4653,7 +4760,6 @@ window.iniciarNovoCiclo = function() {
     const cargaVal = parseInt(document.getElementById("cargaDiariaInput").value);
     const finaisDeSemana = document.getElementById("chkFinaisDeSemana").checked;
 
-    // Coletar matérias e pesos
     const materiasConfig = [];
     window.materiaSelecionadasPlanner.forEach(m => {
         const pesoEl = document.getElementById(`peso-${m.replace(/\s+/g, '-')}`);
@@ -4661,7 +4767,6 @@ window.iniciarNovoCiclo = function() {
         materiasConfig.push({ nome: m, peso: peso });
     });
 
-    // Algoritmo de Distribuição Proporcional (Ciclo de Estudos)
     const materiasPool = [];
     materiasConfig.forEach(m => {
         for (let i = 0; i < m.peso; i++) {
@@ -4738,7 +4843,7 @@ window.iniciarNovoCiclo = function() {
     window.renderizarPlanner();
 };
 
-// 3. DASHBOARD DO CICLO ATIVO
+// 3. SUB-ABA 1: DASHBOARD DO CICLO ATIVO
 window.renderizarDashboardCicloPlanner = function(container) {
     const p = progressoUsuario.planner;
     const meta = p.config.metaTotal;
@@ -4751,7 +4856,7 @@ window.renderizarDashboardCicloPlanner = function(container) {
         const diaDaSemanaNomes = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
         const d = new Date();
         p.progresso.historicoDias[hojeKey] = {
-            materia: p.config.disciplinas[Math.floor(Math.random() * p.config.disciplinas.length)].nome,
+            materia: p.config.disciplinas.length > 0 ? p.config.disciplinas[Math.floor(Math.random() * p.config.disciplinas.length)].nome : "Direito Constitucional",
             planejado: p.config.objetivo === "horas" ? p.config.cargaDiaria * 60 : Math.ceil(meta / 10),
             realizado: 0,
             concluido: false,
@@ -4791,7 +4896,7 @@ window.renderizarDashboardCicloPlanner = function(container) {
             <div class="${cardClass}">
                 <div class="day-num">${dia.diaNome}</div>
                 ${details}
-                <div class="day-status">${statusText}</div>
+                <div class="day-status" style="font-size: 0.65rem;">${statusText}</div>
             </div>
         `;
     });
@@ -4820,7 +4925,7 @@ window.renderizarDashboardCicloPlanner = function(container) {
             : `${diaHoje.realizado} quest.`;
 
         metaHojeTexto = `
-            <span class="meta-badge" style="background-color: var(--accent-light); color: var(--accent); font-weight: bold; margin-bottom: 12px; display: inline-block;">Foco do Dia</span>
+            <span class="meta-badge" style="background-color: var(--accent-light); color: var(--accent); font-weight: bold; margin-bottom: 12px; display: inline-block; padding: 4px 8px; border-radius: 6px;">Foco do Dia</span>
             <h3 style="font-size: 1.5rem; font-weight: 850; color: var(--text-primary); margin-bottom: 6px;">${diaHoje.materia}</h3>
             <p style="font-size: 0.95rem; color: var(--text-secondary); margin-bottom: 20px;">
                 Meta de hoje: realizar <strong>${hojeMetaText}</strong> de estudos. Progresso atual: <strong>${hojeRealizadoText}</strong>
@@ -4828,8 +4933,8 @@ window.renderizarDashboardCicloPlanner = function(container) {
             
             <div style="display:flex; flex-wrap:wrap; gap:12px;">
                 <button class="btn btn-primary" onclick="window.resolverMetaHoje('${diaHoje.materia}')" style="font-weight: 750;">🚀 Resolver na Sala</button>
-                <button class="btn btn-outline-secondary" onclick="window.abrirModalManualPlanner()" style="font-weight: 700;">⏱️ Registrar Estudo Manual</button>
-                <button class="btn btn-outline-success" onclick="window.concluirMetaDoDia()" style="font-weight: 700;">✔️ Meta Concluída</button>
+                <button class="btn btn-outline-secondary" onclick="window.abrirModalManualPlanner()" style="font-weight: 700; border: 1.5px solid var(--border); color: var(--text-primary);">⏱️ Registrar Estudo Manual</button>
+                <button class="btn btn-outline-success" onclick="window.concluirMetaDoDia()" style="font-weight: 700; border: 1.5px solid var(--correct); color: var(--correct);">✔️ Meta Concluída</button>
             </div>
         `;
     }
@@ -4861,7 +4966,7 @@ window.renderizarDashboardCicloPlanner = function(container) {
 
                 <div style="display:flex; justify-content: space-between; border-top: 1.5px solid var(--border); padding-top: 15px; margin-top: 15px;">
                     <button class="btn btn-outline-danger btn-sm" onclick="window.abandonarCiclo()" style="font-weight:700;">Abandonar Ciclo</button>
-                    <button class="btn btn-success" onclick="window.finalizarCicloEGerarRelatorio()" style="font-weight:750;">🏁 Concluir Ciclo e Ver Relatório</button>
+                    <button class="btn btn-success" onclick="window.finalizarCicloEGerarRelatorio()" style="font-weight:750; background-color: var(--correct); border-color: var(--correct); color: white;">🏁 Concluir Ciclo e Ver Relatório</button>
                 </div>
             </div>
 
@@ -4875,16 +4980,16 @@ window.renderizarDashboardCicloPlanner = function(container) {
         </div>
 
         <!-- Meta do Dia -->
-        <div class="planner-today-target-card">
+        <div class="planner-today-target-card" style="background-color: var(--bg-card); border-color: var(--border);">
             ${metaHojeTexto}
         </div>
 
         <!-- Modal de registro manual -->
         <div id="plannerManualModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background-color:rgba(0,0,0,0.5); z-index:9999; justify-content:center; align-items:center;">
             <div class="card-base" style="background-color:var(--bg-card); border-radius:16px; width:350px; padding:25px; border: 2px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
-                <h3 style="font-size:1.15rem; font-weight:800; margin-bottom:15px;">⏱️ Registrar Estudo</h3>
+                <h3 style="font-size:1.15rem; font-weight:800; margin-bottom:15px; color:var(--text-primary);">⏱️ Registrar Estudo</h3>
                 <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:15px;">Quantos minutos você estudou esta disciplina hoje?</p>
-                <input type="number" id="manualMinutosInput" placeholder="Minutos (ex: 60, 120)" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); background-color:var(--bg-app); color:var(--text-primary); font-size:1rem; margin-bottom:20px;">
+                <input type="number" id="manualMinutosInput" placeholder="Minutos (ex: 60, 120)" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); background-color:var(--bg-primary); color:var(--text-primary); font-size:1rem; margin-bottom:20px;">
                 <div style="display:flex; justify-content:flex-end; gap:10px;">
                     <button class="btn btn-outline-secondary" onclick="window.fecharModalManualPlanner()">Cancelar</button>
                     <button class="btn btn-primary" onclick="window.salvarEstudoManual()">Confirmar</button>
@@ -4973,9 +5078,80 @@ window.abandonarCiclo = function() {
     }
 };
 
-// 4. RELATÓRIO DO FIM DO CICLO
+// 4. SUB-ABA 1: RELATÓRIO DO FIM DO CICLO
 window.finalizarCicloEGerarRelatorio = function() {
     const p = progressoUsuario.planner;
+    const meta = p.config.metaTotal;
+    const realizado = p.progresso.totalRealizado || 0;
+
+    const questoesCicloIds = p.progresso.questoesCiclo || [];
+    const totalQuestoesCiclo = questoesCicloIds.length;
+
+    let acertos = 0;
+    let erros = 0;
+    const performanceMateria = {};
+
+    questoesCicloIds.forEach(qId => {
+        const q = obterQuestaoPorId(qId);
+        const resp = progressoUsuario.respondidas[qId];
+        if (q && resp) {
+            const correta = !!resp.correta;
+            if (correta) acertos++;
+            else erros++;
+
+            const mat = q.disciplina || "Geral";
+            if (!performanceMateria[mat]) {
+                performanceMateria[mat] = { acertos: 0, total: 0 };
+            }
+            performanceMateria[mat].total++;
+            if (correta) performanceMateria[mat].acertos++;
+        }
+    });
+
+    const taxaAcerto = totalQuestoesCiclo > 0 ? Math.round((acertos / totalQuestoesCiclo) * 100) : 0;
+    const percentConclusao = Math.min(100, Math.round((realizado / meta) * 100));
+
+    // Salvar no histórico antes de mostrar relatório
+    const consolidadoDisciplinas = p.config.disciplinas.map(d => {
+        const matName = d.nome;
+        const perf = performanceMateria[matName] || { acertos: 0, total: 0 };
+        // Estimar tempo estudado nas metas diárias
+        let tempoMin = 0;
+        Object.keys(p.progresso.historicoDias).forEach(k => {
+            const day = p.progresso.historicoDias[k];
+            if (day.materia === matName) {
+                tempoMin += day.realizado;
+            }
+        });
+        return {
+            nome: matName,
+            peso: d.peso,
+            horasEstudadas: p.config.objetivo === "horas" ? (tempoMin / 60) : 0,
+            questoesResolvidas: perf.total,
+            questoesAcertadas: perf.acertos
+        };
+    });
+
+    const cicloRecord = {
+        id: 'cycle_' + Date.now(),
+        name: `Ciclo ${progressoUsuario.plannerHistory.length + 1} - ${p.config.objetivo === 'horas' ? 'Horas' : 'Questões'}`,
+        start: Object.keys(p.progresso.historicoDias).sort()[0] || new Date().toISOString().split('T')[0],
+        end: Object.keys(p.progresso.historicoDias).sort().slice(-1)[0] || new Date().toISOString().split('T')[0],
+        objetivo: p.config.objetivo,
+        metaTotal: meta,
+        totalRealizado: realizado,
+        percentConclusao: percentConclusao,
+        totalQuestoes: totalQuestoesCiclo,
+        totalAcertos: acertos,
+        taxaAcerto: taxaAcerto,
+        disciplinesPerformance: consolidadoDisciplinas
+    };
+
+    // Prevenir duplicidade no histórico se o usuário atualizar a página no relatório
+    if (!progressoUsuario.plannerHistory.some(h => h.name === cicloRecord.name)) {
+        progressoUsuario.plannerHistory.unshift(cicloRecord);
+    }
+
     p.emExibicaoRelatorio = true;
     salvarProgressoLocal();
     window.renderizarPlanner();
@@ -5036,7 +5212,7 @@ window.renderizarRelatorioPlanner = function(container) {
     } else {
         consultoriaHTML = `
             <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 25px; background-color: var(--bg-card); color: var(--text-secondary); margin-bottom: 25px; text-align: center;">
-                <h3 style="font-size: 1.1rem; font-weight: 800; margin-bottom: 8px;">🎓 Orientação Pedagógica</h3>
+                <h3 style="font-size: 1.1rem; font-weight: 800; margin-bottom: 8px; color: var(--text-primary);">🎓 Orientação Pedagógica</h3>
                 <p style="font-size: 0.9rem;">Resolva questões na sala de estudos durante o ciclo para habilitar os conselhos da inteligência de curação.</p>
             </div>
         `;
@@ -5049,7 +5225,7 @@ window.renderizarRelatorioPlanner = function(container) {
         tabelaHTML += `
             <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1.5px solid var(--border); padding: 10px 0;">
                 <span style="font-weight: 750; font-size:0.9rem; color:var(--text-primary);">${mat}</span>
-                <span style="font-weight: bold; font-size:0.9rem; color: ${rate >= 70 ? 'var(--correta)' : 'var(--errada)'};">${rate}% de acertos (${item.total} q.)</span>
+                <span style="font-weight: bold; font-size:0.9rem; color: ${rate >= 70 ? 'var(--correct)' : 'var(--incorrect)'};">${rate}% de acertos (${item.total} q.)</span>
             </div>
         `;
     });
@@ -5075,29 +5251,29 @@ window.renderizarRelatorioPlanner = function(container) {
         <div class="planner-report-grid">
             <!-- Aproveitamento Global -->
             <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 25px; background-color: var(--bg-card);">
-                <h3 style="font-size: 1.2rem; font-weight: 850; margin-bottom: 20px; border-bottom: 1.5px solid var(--border); padding-bottom: 10px;">📈 Aproveitamento Geral</h3>
+                <h3 style="font-size: 1.2rem; font-weight: 850; margin-bottom: 20px; border-bottom: 1.5px solid var(--border); padding-bottom: 10px; color: var(--text-primary);">📈 Aproveitamento Geral</h3>
                 
-                <div style="display:flex; justify-content:space-between; margin-bottom:12px;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:12px; color: var(--text-primary);">
                     <span style="font-weight:700; color:var(--text-secondary);">Metas Executadas:</span>
-                    <span style="font-weight:bold; color:var(--text-primary);">${percentConclusao}% da meta batida</span>
+                    <span style="font-weight:bold;">${percentConclusao}% da meta batida</span>
                 </div>
                 <div style="height:10px; background-color:var(--border); border-radius:5px; overflow:hidden; margin-bottom:25px;">
                     <div style="width:${percentConclusao}%; height:100%; background-color:var(--accent); border-radius:5px;"></div>
                 </div>
 
-                <div style="display:flex; justify-content:space-between; margin-bottom:12px; font-size:0.9rem;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:12px; font-size:0.9rem; color: var(--text-primary);">
                     <span>Volume Planejado vs Executado:</span>
                     <span style="font-weight:800;">${tempoConclusaoText}</span>
                 </div>
-                <div style="display:flex; justify-content:space-between; margin-bottom:12px; font-size:0.9rem;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:12px; font-size:0.9rem; color: var(--text-primary);">
                     <span>Taxa de Acertos Geral do Ciclo:</span>
-                    <span style="font-weight:800; color:var(--correta);">${taxaAcerto}% acerto (${totalQuestoesCiclo} res.)</span>
+                    <span style="font-weight:800; color:var(--correct);">${taxaAcerto}% acerto (${totalQuestoesCiclo} res.)</span>
                 </div>
             </div>
 
             <!-- Detalhe por Disciplinas -->
             <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 25px; background-color: var(--bg-card);">
-                <h3 style="font-size: 1.2rem; font-weight: 850; margin-bottom: 20px; border-bottom: 1.5px solid var(--border); padding-bottom: 10px;">📊 Desempenho por Matéria</h3>
+                <h3 style="font-size: 1.2rem; font-weight: 850; margin-bottom: 20px; border-bottom: 1.5px solid var(--border); padding-bottom: 10px; color: var(--text-primary);">📊 Desempenho por Matéria</h3>
                 <div>
                     ${tabelaHTML}
                 </div>
@@ -5105,7 +5281,7 @@ window.renderizarRelatorioPlanner = function(container) {
         </div>
 
         <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:25px; border-top:1.5px solid var(--border); padding-top:20px;">
-            <button class="btn btn-outline-secondary" onclick="window.print()" style="font-weight:700;">🖨️ Imprimir Relatório</button>
+            <button class="btn btn-outline-secondary" onclick="window.print()" style="font-weight:700; border: 1.5px solid var(--border); color: var(--text-primary);">🖨️ Imprimir Relatório</button>
             <button class="btn btn-primary" onclick="window.limparRelatorioPlanner()" style="font-weight:750;">🆕 Iniciar Novo Ciclo</button>
         </div>
     `;
@@ -5120,4 +5296,1148 @@ window.limparRelatorioPlanner = function() {
     };
     salvarProgressoLocal();
     window.renderizarPlanner();
+};
+
+// ==================== SUB-ABA 2: QUADRO DE HORÁRIOS GERAL ====================
+
+window.renderizarQuadroHorarios = function(container) {
+    const dayNames = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo'];
+    const activeDayName = dayNames[window.currentDayIndexPlanner];
+    const weeklyData = progressoUsuario.weeklyTemplate;
+    
+    // Cálculo dos totais da semana
+    const totals = { work: 0, gym: 0, rest: 0, random: 0, study: 0, empty: 0 };
+    for (let day = 0; day < 7; day++) {
+        const sched = weeklyData[day] || Array(24).fill('empty');
+        sched.forEach(h => {
+            if (totals[h] !== undefined) totals[h]++;
+        });
+    }
+    const weeklyStudyHours = totals.empty + totals.study;
+
+    // Cálculo das horas livres de hoje
+    const todaySched = weeklyData[window.currentDayIndexPlanner] || Array(24).fill('empty');
+    let todayFree = 0;
+    todaySched.forEach(slot => {
+        if (slot === 'empty' || slot === 'study') todayFree++;
+    });
+
+    // Renderizando a linha de blocos de 24h
+    let hoursHTML = "";
+    const translations = {
+        empty: 'Livre (Potencial de Estudo)',
+        work: 'Trabalho / Emprego',
+        gym: 'Academia',
+        rest: 'Descanso / Sono',
+        random: 'Compromissos',
+        study: 'Foco Estudo Direto'
+    };
+
+    for (let hour = 0; hour < 24; hour++) {
+        const type = todaySched[hour] || 'empty';
+        hoursHTML += `
+            <div class="hour-row" style="margin-bottom: 5px;">
+                <div class="hour-label">${String(hour).padStart(2, '0')}:00</div>
+                <div class="hour-block ${type}" data-hour="${hour}" 
+                     onmousedown="event.preventDefault(); window.dragMouseDownPlanner = true; window.pintarBlocoHorario(${hour})"
+                     onmouseenter="if(window.dragMouseDownPlanner) window.pintarBlocoHorario(${hour})">
+                     ${translations[type]}
+                </div>
+            </div>
+        `;
+    }
+
+    container.innerHTML = `
+        <div class="planner-banner" style="background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);">
+            <h1 class="planner-banner-title">🕒 Quadro de Horários Geral</h1>
+            <p class="planner-banner-desc">Planeje sua rotina diária. Marque seus compromissos para encontrar suas janelas reais livres para estudar.</p>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 25px; margin-bottom: 25px;">
+            <!-- Quadro Interativo -->
+            <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 25px; background-color: var(--bg-card);">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid var(--border); padding-bottom: 10px; margin-bottom: 15px; flex-wrap:wrap; gap:10px;">
+                    <h2 style="font-size: 1.15rem; font-weight: 850; color: var(--text-primary); margin:0;">🗓️ Agenda de Rotina: ${activeDayName}</h2>
+                    
+                    <div class="day-selector">
+                        <button class="day-btn ${window.currentDayIndexPlanner === 0 ? 'active' : ''}" onclick="window.currentDayIndexPlanner = 0; window.renderizarPlanner()">Seg</button>
+                        <button class="day-btn ${window.currentDayIndexPlanner === 1 ? 'active' : ''}" onclick="window.currentDayIndexPlanner = 1; window.renderizarPlanner()">Ter</button>
+                        <button class="day-btn ${window.currentDayIndexPlanner === 2 ? 'active' : ''}" onclick="window.currentDayIndexPlanner = 2; window.renderizarPlanner()">Qua</button>
+                        <button class="day-btn ${window.currentDayIndexPlanner === 3 ? 'active' : ''}" onclick="window.currentDayIndexPlanner = 3; window.renderizarPlanner()">Qui</button>
+                        <button class="day-btn ${window.currentDayIndexPlanner === 4 ? 'active' : ''}" onclick="window.currentDayIndexPlanner = 4; window.renderizarPlanner()">Sex</button>
+                        <button class="day-btn ${window.currentDayIndexPlanner === 5 ? 'active' : ''}" onclick="window.currentDayIndexPlanner = 5; window.renderizarPlanner()">Sáb</button>
+                        <button class="day-btn ${window.currentDayIndexPlanner === 6 ? 'active' : ''}" onclick="window.currentDayIndexPlanner = 6; window.renderizarPlanner()">Dom</button>
+                    </div>
+                </div>
+
+                <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 15px;">
+                    💡 Selecione a atividade na legenda abaixo e clique ou arraste o cursor sobre as horas para colorir o quadro.
+                </p>
+
+                <div class="hours-timeline" style="margin-top:0;">
+                    ${hoursHTML}
+                </div>
+
+                <div class="schedule-legend">
+                    <div class="legend-item ${window.legendTypePlanner === 'empty' ? 'selected' : ''}" onclick="window.setLegendTypePlanner('empty')">
+                        <div class="legend-color empty"></div>
+                        <span>Janela Livre (Estudo)</span>
+                    </div>
+                    <div class="legend-item ${window.legendTypePlanner === 'work' ? 'selected' : ''}" onclick="window.setLegendTypePlanner('work')">
+                        <div class="legend-color work"></div>
+                        <span>Trabalho</span>
+                    </div>
+                    <div class="legend-item ${window.legendTypePlanner === 'gym' ? 'selected' : ''}" onclick="window.setLegendTypePlanner('gym')">
+                        <div class="legend-color gym"></div>
+                        <span>Academia</span>
+                    </div>
+                    <div class="legend-item ${window.legendTypePlanner === 'rest' ? 'selected' : ''}" onclick="window.setLegendTypePlanner('rest')">
+                        <div class="legend-color rest"></div>
+                        <span>Descanso / Sono</span>
+                    </div>
+                    <div class="legend-item ${window.legendTypePlanner === 'random' ? 'selected' : ''}" onclick="window.setLegendTypePlanner('random')">
+                        <div class="legend-color random"></div>
+                        <span>Compromissos</span>
+                    </div>
+                    <div class="legend-item ${window.legendTypePlanner === 'study' ? 'selected' : ''}" onclick="window.setLegendTypePlanner('study')">
+                        <div class="legend-color study"></div>
+                        <span>Estudo Direto</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Resumo e Métricas Semanais -->
+            <div style="display:flex; flex-direction:column; gap:20px;">
+                <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 25px; background-color: var(--bg-card);">
+                    <h2 style="font-size:1.15rem; font-weight:800; color:var(--text-primary); margin-bottom:15px;">📊 Resumo da Rotina Semanal</h2>
+                    <div style="display:flex; flex-direction:column; gap:10px; font-size: 0.9rem; color:var(--text-primary);">
+                        <div style="display:flex; justify-content:space-between;">
+                            <span>💼 Trabalho:</span>
+                            <strong>${totals.work}h / semana</strong>
+                        </div>
+                        <div style="display:flex; justify-content:space-between;">
+                            <span>💪 Academia:</span>
+                            <strong>${totals.gym}h / semana</strong>
+                        </div>
+                        <div style="display:flex; justify-content:space-between;">
+                            <span>💤 Descanso/Sono:</span>
+                            <strong>${totals.rest}h / semana</strong>
+                        </div>
+                        <div style="display:flex; justify-content:space-between;">
+                            <span>🎈 Compromissos/Outros:</span>
+                            <strong>${totals.random}h / semana</strong>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; border-top:1px solid var(--border); padding-top:10px; margin-top:5px; font-size:1.05rem;">
+                            <span>🎯 Potencial de Estudo:</span>
+                            <span style="color:var(--accent); font-weight:bold;">${weeklyStudyHours}h / semana</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 25px; background-color: var(--bg-card); flex:1;">
+                    <h2 style="font-size:1.15rem; font-weight:800; color:var(--text-primary); margin-bottom:15px;">💡 Janelas para ${activeDayName}</h2>
+                    <p style="font-size:0.92rem; line-height:1.6; color:var(--text-secondary);">
+                        Neste dia, você possui um total de <strong style="color:var(--accent); font-size:1.1rem;">${todayFree}h</strong> livres para se preparar. 
+                    </p>
+                    <p style="font-size:0.85rem; margin-top:10px; color:var(--text-secondary);">
+                        *Você pode registrar sessões de estudo a qualquer momento. Se estudar durante o trabalho, use o registro manual na aba do ciclo para consolidar o tempo!
+                    </p>
+                </div>
+            </div>
+        </div>
+    `;
+};
+
+window.setLegendTypePlanner = function(type) {
+    window.legendTypePlanner = type;
+    window.renderizarPlanner();
+};
+
+window.pintarBlocoHorario = function(hour) {
+    progressoUsuario.weeklyTemplate[window.currentDayIndexPlanner][hour] = window.legendTypePlanner;
+    salvarProgressoLocal();
+    window.renderizarPlanner();
+};
+
+// ==================== SUB-ABA 3: ACOMPANHAMENTO & METAS ====================
+
+window.renderizarAcompanhamentoMetas = function(container) {
+    const p = progressoUsuario.planner;
+    const history = progressoUsuario.plannerHistory || [];
+    
+    let activeCycleHTML = "";
+    
+    if (p.cicloAtivo) {
+        const metaVal = p.config.metaTotal;
+        const realizadoVal = p.progresso.totalRealizado || 0;
+        
+        // Histórico de questões do ciclo ativo
+        const questoesCicloIds = p.progresso.questoesCiclo || [];
+        let acertos = 0;
+        const perfMateria = {};
+        
+        // Inicializar com matérias do ciclo
+        p.config.disciplinas.forEach(d => {
+            perfMateria[d.nome] = { acertos: 0, total: 0, tempoMinutos: 0 };
+        });
+
+        // Contabilizar desempenho
+        questoesCicloIds.forEach(qId => {
+            const q = obterQuestaoPorId(qId);
+            const resp = progressoUsuario.respondidas[qId];
+            if (q && resp) {
+                const correta = !!resp.correta;
+                if (correta) acertos++;
+                
+                const mat = q.disciplina || "Geral";
+                if (!perfMateria[mat]) {
+                    perfMateria[mat] = { acertos: 0, total: 0, tempoMinutos: 0 };
+                }
+                perfMateria[mat].total++;
+                if (correta) perfMateria[mat].acertos++;
+            }
+        });
+
+        // Contabilizar tempos das metas diárias do ciclo
+        Object.keys(p.progresso.historicoDias).forEach(k => {
+            const day = p.progresso.historicoDias[k];
+            if (day.materia && perfMateria[day.materia]) {
+                perfMateria[day.materia].tempoMinutos += day.realizado;
+            }
+        });
+
+        const taxaAcertoGeral = questoesCicloIds.length > 0 ? Math.round((acertos / questoesCicloIds.length) * 100) : 0;
+        
+        // 1. Checklist Inteligente (Checks)
+        const checklist = [];
+        
+        // Meta 1: Concluir Horas Totais
+        const displayRealizado = p.config.objetivo === "horas" ? Math.floor(realizadoVal/60) : realizadoVal;
+        const checkedMetas = displayRealizado >= metaVal;
+        checklist.push({
+            label: `Bater meta geral: ${displayRealizado} de ${metaVal} ${p.config.objetivo === "horas" ? "horas" : "questões"}`,
+            meta: "Geral",
+            checked: checkedMetas
+        });
+
+        // Meta 2: Rendimento > 70%
+        checklist.push({
+            label: `Rendimento acima de 70% (Atual: ${taxaAcertoGeral}%)`,
+            meta: "Qualidade",
+            checked: taxaAcertoGeral >= 70 && questoesCicloIds.length >= 5
+        });
+
+        // Metas individuais baseadas nos pesos alocados no ciclo
+        const cargaDiariaHoras = p.config.cargaDiaria;
+        
+        // Contar quantos dias planejados cada matéria recebeu no cronograma
+        const slotsMateria = {};
+        p.config.disciplinas.forEach(d => { slotsMateria[d.nome] = 0; });
+        Object.keys(p.progresso.historicoDias).forEach(k => {
+            const day = p.progresso.historicoDias[k];
+            if (day.eDiaEstudo && day.materia && slotsMateria[day.materia] !== undefined) {
+                slotsMateria[day.materia]++;
+            }
+        });
+
+        p.config.disciplinas.forEach(d => {
+            const plannedSlots = slotsMateria[d.nome] || 0;
+            const metaHorasMateria = plannedSlots * cargaDiariaHoras;
+            
+            const matPerf = perfMateria[d.nome] || { acertos: 0, total: 0, tempoMinutos: 0 };
+            const horasEstudadas = matPerf.tempoMinutos / 60;
+            
+            checklist.push({
+                label: `Estudar ${d.nome}: ${horasEstudadas.toFixed(1)}h de ${metaHorasMateria}h planejadas`,
+                meta: `Peso ${d.peso}`,
+                checked: horasEstudadas >= metaHorasMateria && metaHorasMateria > 0
+            });
+        });
+
+        let checklistHTML = "";
+        checklist.forEach(item => {
+            checklistHTML += `
+                <div class="checklist-item ${item.checked ? 'checked' : ''}">
+                    <div class="checklist-checkbox">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                    </div>
+                    <span class="checklist-text">${item.label}</span>
+                    <span class="checklist-meta">${item.meta}</span>
+                </div>
+            `;
+        });
+
+        // 2. Tabela de Desempenho por Matéria
+        let tableRowsHTML = "";
+        p.config.disciplinas.forEach(d => {
+            const matPerf = perfMateria[d.nome] || { acertos: 0, total: 0, tempoMinutos: 0 };
+            const acc = matPerf.total > 0 ? Math.round((matPerf.acertos / matPerf.total) * 100) : 0;
+            const tempoTexto = `${Math.floor(matPerf.tempoMinutos/60)}h ${matPerf.tempoMinutos%60}m`;
+            
+            tableRowsHTML += `
+                <tr>
+                    <td style="font-weight:bold; color:var(--text-primary); padding:10px 5px;">${d.nome}</td>
+                    <td style="color:var(--text-secondary); text-align:center; font-weight:bold;">P${d.peso}</td>
+                    <td style="color:var(--text-secondary); text-align:center;">${tempoTexto}</td>
+                    <td style="color:var(--text-secondary); text-align:center;">${matPerf.total}</td>
+                    <td style="color:var(--correct); text-align:center; font-weight:bold;">${matPerf.acertos}</td>
+                    <td style="color:var(--incorrect); text-align:center; font-weight:bold;">${matPerf.total - matPerf.acertos}</td>
+                    <td style="color: ${acc >= 70 ? 'var(--correct)' : 'var(--warning)'}; text-align:right; font-weight:bold;">${acc}%</td>
+                </tr>
+            `;
+        });
+
+        // Preparar Arrays para Gráficos
+        const chartLabels = [];
+        const chartGoalData = [];
+        const chartActualData = [];
+        const chartAccuracyData = [];
+
+        p.config.disciplinas.forEach(d => {
+            chartLabels.push(d.nome.split(' ').slice(0, 2).join(' ')); // Abreviar nome da matéria
+            
+            const plannedSlots = slotsMateria[d.nome] || 0;
+            chartGoalData.push(plannedSlots * cargaDiariaHoras);
+            
+            const matPerf = perfMateria[d.nome] || { acertos: 0, total: 0, tempoMinutos: 0 };
+            chartActualData.push(parseFloat((matPerf.tempoMinutos / 60).toFixed(1)));
+            
+            const acc = matPerf.total > 0 ? Math.round((matPerf.acertos / matPerf.total) * 100) : 0;
+            chartAccuracyData.push(acc);
+        });
+
+        activeCycleHTML = `
+            <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 25px; background-color: var(--bg-card); margin-bottom: 25px;">
+                <h2 style="font-size:1.2rem; font-weight:850; color:var(--text-primary); margin-bottom:15px; border-bottom:1.5px solid var(--border); padding-bottom:10px;">📋 Quadro de Verificação (Ciclo Ativo)</h2>
+                
+                <div class="checklist-container">
+                    ${checklistHTML}
+                </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns: 1.2fr 1fr; gap:25px; margin-bottom:25px;">
+                <!-- Tabela Analítica de Disciplinas -->
+                <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 25px; background-color: var(--bg-card);">
+                    <h2 style="font-size:1.1rem; font-weight:800; color:var(--text-primary); margin-bottom:15px;">📚 Andamento das Disciplinas</h2>
+                    <table style="width:100%; border-collapse:collapse; font-size:0.85rem;">
+                        <thead>
+                            <tr style="border-bottom: 1.5px solid var(--border); text-align:left; color:var(--text-secondary);">
+                                <th style="padding-bottom:8px;">Matéria</th>
+                                <th style="padding-bottom:8px; text-align:center;">Peso</th>
+                                <th style="padding-bottom:8px; text-align:center;">Tempo</th>
+                                <th style="padding-bottom:8px; text-align:center;">Res.</th>
+                                <th style="padding-bottom:8px; text-align:center;">Acertos</th>
+                                <th style="padding-bottom:8px; text-align:center;">Erros</th>
+                                <th style="padding-bottom:8px; text-align:right;">Aproveit.</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${tableRowsHTML}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Gráficos de Apoio -->
+                <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 25px; background-color: var(--bg-card); display:flex; flex-direction:column; gap:20px;">
+                    <div>
+                        <h2 style="font-size:1rem; font-weight:800; color:var(--text-primary); margin-bottom:5px;">Meta vs Realizado (Horas)</h2>
+                        <div class="chart-container-planner" style="height:120px;">
+                            <canvas id="planner-hours-chart"></canvas>
+                        </div>
+                    </div>
+                    <div>
+                        <h2 style="font-size:1rem; font-weight:800; color:var(--text-primary); margin-bottom:5px;">Rendimento (%)</h2>
+                        <div class="chart-container-planner" style="height:120px;">
+                            <canvas id="planner-acc-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Renderizar os gráficos logo após a injeção do HTML
+        setTimeout(() => {
+            window.renderizarGraficosPlanner(chartLabels, chartGoalData, chartActualData, chartAccuracyData);
+        }, 100);
+    } else {
+        activeCycleHTML = `
+            <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 25px; background-color: var(--bg-card); text-align:center; color:var(--text-secondary); margin-bottom:25px;">
+                <h3>Nenhum Ciclo Ativo</h3>
+                <p style="font-size:0.9rem; margin-top:5px;">Inicie um ciclo de estudos na primeira aba para habilitar o quadro de verificação de metas.</p>
+            </div>
+        `;
+    }
+
+    // Histórico de Ciclos Concluídos
+    let historyHTML = "";
+    if (history.length === 0) {
+        historyHTML = `
+            <div style="text-align:center; color:var(--text-secondary); padding:20px; font-size:0.9rem;">
+                Nenhum ciclo consolidado no histórico. Finalize um ciclo ativo para visualizar os registros passados.
+            </div>
+        `;
+    } else {
+        history.forEach(c => {
+            let detailsRows = "";
+            c.disciplinesPerformance.forEach(d => {
+                const dAcc = d.questoesResolvidas > 0 ? Math.round((d.questoesAcertadas / d.questoesResolvidas) * 100) : 0;
+                const dTempo = d.horasEstudadas > 0 ? `${d.horasEstudadas.toFixed(1)}h` : '0h';
+                
+                detailsRows += `
+                    <div style="background-color:var(--bg-primary); border:1px solid var(--border); padding:8px 12px; border-radius:8px; display:flex; flex-direction:column; gap:2px;">
+                        <span style="font-weight:bold; font-size:0.8rem; color:var(--text-primary);">${d.nome}</span>
+                        <span style="font-size:0.75rem; color:var(--text-secondary);">
+                            Tempo: ${dTempo} | Questões: ${d.questoesResolvidas} (Acertos: ${d.questoesAcertadas}) | Rendimento: <strong style="color:var(--correct)">${dAcc}%</strong>
+                        </span>
+                    </div>
+                `;
+            });
+
+            historyHTML += `
+                <div class="history-cycle-card" style="margin-bottom: 15px;">
+                    <div class="history-cycle-header">
+                        <span class="history-cycle-title">${c.name}</span>
+                        <span class="history-cycle-date">De ${c.start.split('-').reverse().join('/')} a ${c.end.split('-').reverse().join('/')}</span>
+                    </div>
+                    <div class="history-cycle-stats" style="margin-bottom:15px; border-bottom:1px solid var(--border); padding-bottom:10px;">
+                        <div class="history-cycle-stat-item">
+                            <span class="history-cycle-stat-label">Meta Batida</span>
+                            <span class="history-cycle-stat-value">${c.percentConclusao}%</span>
+                        </div>
+                        <div class="history-cycle-stat-item">
+                            <span class="history-cycle-stat-label">Total Realizado</span>
+                            <span class="history-cycle-stat-value">${c.objetivo === 'horas' ? Math.floor(c.totalRealizado / 60) + 'h' : c.totalRealizado + ' q.'}</span>
+                        </div>
+                        <div class="history-cycle-stat-item">
+                            <span class="history-cycle-stat-label">Questões</span>
+                            <span class="history-cycle-stat-value">${c.totalQuestoes} resolvidas</span>
+                        </div>
+                        <div class="history-cycle-stat-item">
+                            <span class="history-cycle-stat-label">Acertos</span>
+                            <span class="history-cycle-stat-value" style="color:var(--correct)">${c.totalAcertos} acertos (${c.taxaAcerto}%)</span>
+                        </div>
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:8px;">
+                        <h4 style="font-size:0.8rem; font-weight:800; color:var(--text-secondary); text-transform:uppercase;">Detalhamento das Disciplinas:</h4>
+                        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:10px;">
+                            ${detailsRows}
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    container.innerHTML = `
+        <div class="planner-banner" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+            <h1 class="planner-banner-title">📈 Acompanhamento & Metas do Ciclo</h1>
+            <p class="planner-banner-desc">Monitore o alcance dos objetivos estabelecidos no ciclo e analise os históricos consolidados dos ciclos passados.</p>
+        </div>
+
+        ${activeCycleHTML}
+
+        <!-- Histórico Consolidados -->
+        <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 25px; background-color: var(--bg-card);">
+            <h2 style="font-size: 1.25rem; font-weight: 850; margin-bottom: 20px; border-bottom: 1.5px solid var(--border); padding-bottom: 10px; color: var(--text-primary);">📁 Ciclos Anteriores (Histórico Sintético)</h2>
+            <div class="history-cycles-list">
+                ${historyHTML}
+            </div>
+        </div>
+    `;
+};
+
+window.renderizarGraficosPlanner = function(labels, goalData, actualData, accuracyData) {
+    const rootStyle = getComputedStyle(document.documentElement);
+    const accentColor = rootStyle.getPropertyValue('--accent').trim() || '#3b82f6';
+    const correctColor = rootStyle.getPropertyValue('--correct').trim() || '#10b981';
+    const borderColor = rootStyle.getPropertyValue('--border').trim() || '#cbd5e1';
+    const textSecColor = rootStyle.getPropertyValue('--text-secondary').trim() || '#475569';
+
+    // 1. Horas Chart
+    const hoursCtx = document.getElementById('planner-hours-chart')?.getContext('2d');
+    if (hoursCtx) {
+        new Chart(hoursCtx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Meta',
+                        data: goalData,
+                        backgroundColor: 'rgba(100, 116, 139, 0.15)',
+                        borderColor: borderColor,
+                        borderWidth: 1,
+                        borderRadius: 4
+                    },
+                    {
+                        label: 'Realizado',
+                        data: actualData,
+                        backgroundColor: accentColor,
+                        borderColor: accentColor,
+                        borderWidth: 1,
+                        borderRadius: 4
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: 'rgba(0,0,0,0.03)' },
+                        ticks: { color: textSecColor, font: { size: 9 } }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: textSecColor, font: { size: 9 } }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: { boxWidth: 12, font: { size: 9 } }
+                    }
+                }
+            }
+        });
+    }
+
+    // 2. Rendimento Chart
+    const accCtx = document.getElementById('planner-acc-chart')?.getContext('2d');
+    if (accCtx) {
+        new Chart(accCtx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: '% Acertos',
+                    data: accuracyData,
+                    backgroundColor: correctColor,
+                    borderColor: correctColor,
+                    borderWidth: 1,
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        grid: { color: 'rgba(0,0,0,0.03)' },
+                        ticks: { color: textSecColor, font: { size: 9 } }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: textSecColor, font: { size: 9 } }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+    }
+};
+
+// ==========================================================================
+// CONTROLES DE PORTAIS (ALUNO vs ADMIN)
+// ==========================================================================
+window.currentPortalMode = 'student';
+
+window.setPortalMode = function(mode) {
+    window.currentPortalMode = mode;
+    
+    // Atualizar classes do body
+    if (mode === 'admin') {
+        document.body.classList.remove('portal-student');
+        document.body.classList.add('portal-admin');
+        
+        // Ativar botão no portal selector
+        document.getElementById('portal-btn-admin')?.classList.add('active');
+        document.getElementById('portal-btn-student')?.classList.remove('active');
+        
+        // Ir para painel admin status
+        window.navegarAdminTab('geral');
+    } else {
+        document.body.classList.remove('portal-admin');
+        document.body.classList.add('portal-student');
+        
+        // Ativar botão no portal selector
+        document.getElementById('portal-btn-student')?.classList.add('active');
+        document.getElementById('portal-btn-admin')?.classList.remove('active');
+        
+        // Ir para dashboard do estudante
+        navegarPara('dashboard');
+    }
+};
+
+window.navegarAdminTab = function(tabName) {
+    window.adminSubTabAtiva = tabName;
+    navegarPara('admin');
+    
+    // Atualizar botão ativo na barra lateral para as guias do admin
+    const adminButtons = document.querySelectorAll(".sidebar-menu .menu-item");
+    adminButtons.forEach(btn => btn.classList.remove("active"));
+    
+    let btnId = 'btn-nav-admin-status';
+    if (tabName === 'usuarios') btnId = 'btn-nav-admin-users';
+    else if (tabName === 'acessos') btnId = 'btn-nav-admin-access';
+    else if (tabName === 'financeiro') btnId = 'btn-nav-admin-finance';
+    
+    const activeBtn = document.getElementById(btnId);
+    if (activeBtn) activeBtn.classList.add("active");
+};
+
+// ==========================================================================
+// MÓDULO: PAINEL ADMINISTRATIVO (SIMULAÇÃO E VISUALIZAÇÃO)
+// ==========================================================================
+
+// Inicialização de Dados Mockados do Painel Admin
+if (!window.mockAdminUsers) {
+    window.mockAdminUsers = [
+        { id: 1, nome: "Carlos Eduardo Silva", email: "carlos.edu@gmail.com", plano: "VIP", status: "Ativo", data: "12/03/2026" },
+        { id: 2, nome: "Luciana Maria Souza", email: "lu.maria@outlook.com", plano: "Premium", status: "Ativo", data: "28/04/2026" },
+        { id: 3, nome: "Roberto Ramos", email: "roberto.ramos@uol.com.br", plano: "Gratuito", status: "Suspenso", data: "05/05/2026" },
+        { id: 4, nome: "Juliana Mendes", email: "ju.mendes@gmail.com", plano: "Premium", status: "Ativo", data: "15/06/2026" },
+        { id: 5, nome: "Felipe Almeida", email: "felipe.almeida@hotmail.com", plano: "VIP", status: "Inativo", data: "01/07/2026" }
+    ];
+}
+if (!window.mockAdminTransactions) {
+    window.mockAdminTransactions = [
+        { id: "TX_9901", usuario: "Carlos Eduardo Silva", valor: 149.90, data: "25/07/2026", status: "Pago", metodo: "Cartão" },
+        { id: "TX_9902", usuario: "Luciana Maria Souza", valor: 79.90, data: "26/07/2026", status: "Pago", metodo: "Pix" },
+        { id: "TX_9903", usuario: "Juliana Mendes", valor: 79.90, data: "26/07/2026", status: "Pendente", metodo: "Cartão" },
+        { id: "TX_9904", usuario: "Felipe Almeida", valor: 149.90, data: "20/07/2026", status: "Falhou", metodo: "Boleto" },
+        { id: "TX_9905", usuario: "Gustavo Santos", valor: 79.90, data: "18/07/2026", status: "Pago", metodo: "Pix" }
+    ];
+}
+if (!window.mockAdminApiKeys) {
+    window.mockAdminApiKeys = [
+        { id: 1, nome: "Assistente REMB Web", key: "sk-proj-4a...f39b", limite: "50k reqs", uso: "12,431", status: "Ativa" },
+        { id: 2, nome: "Laboratório OCR", key: "sk-proj-d9...88a2", limite: "10k reqs", uso: "3,212", status: "Ativa" },
+        { id: 3, nome: "Integração Mobile", key: "sk-proj-aa...11c4", limite: "100k reqs", uso: "0", status: "Inativa" }
+    ];
+}
+if (!window.assistantActiveLogs) {
+    window.assistantActiveLogs = [
+        { hora: "17:02:15", acao: "Mnemônico gerado para Direito Constitucional (Art. 5º)" },
+        { hora: "17:03:44", acao: "Engenharia Reversa ativada para Inquérito Policial" },
+        { hora: "17:04:12", acao: "Transcrição de áudio enviada pelo usuário 12" },
+        { hora: "17:05:01", acao: "Curadoria automática aprovou 5 afirmativas no Lab" }
+    ];
+}
+if (!window.adminSubTabAtiva) {
+    window.adminSubTabAtiva = 'geral';
+}
+if (window.assistantSystemOnline === undefined) {
+    window.assistantSystemOnline = true;
+}
+
+window.renderizarAdminPanel = function() {
+    const container = document.getElementById("admin-panel-content");
+    if (!container) return;
+
+    // Cabeçalho e Sub-abas segmentadas
+    container.innerHTML = `
+        <div class="planner-banner" style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); margin-bottom: 25px;">
+            <h1 class="planner-banner-title">👑 Painel Administrativo REMB</h1>
+            <p class="planner-banner-desc">Centro de comando para gerenciamento de usuários, chaves de acesso, faturamento e auditoria do assistente pessoal.</p>
+        </div>
+
+        <div class="planner-subtabs">
+            <button class="planner-subtab ${window.adminSubTabAtiva === 'geral' ? 'active' : ''}" onclick="window.renderizarSubTabAdmin('geral')">🤖 Status do REMB</button>
+            <button class="planner-subtab ${window.adminSubTabAtiva === 'usuarios' ? 'active' : ''}" onclick="window.renderizarSubTabAdmin('usuarios')">👥 Usuários</button>
+            <button class="planner-subtab ${window.adminSubTabAtiva === 'acessos' ? 'active' : ''}" onclick="window.renderizarSubTabAdmin('acessos')">🔑 Acessos & APIs</button>
+            <button class="planner-subtab ${window.adminSubTabAtiva === 'financeiro' ? 'active' : ''}" onclick="window.renderizarSubTabAdmin('financeiro')">💰 Financeiro</button>
+        </div>
+
+        <div id="admin-subtab-container"></div>
+    `;
+
+    const subContainer = document.getElementById("admin-subtab-container");
+    
+    if (window.adminSubTabAtiva === 'geral') {
+        window.renderizarAdminTabGeral(subContainer);
+    } else if (window.adminSubTabAtiva === 'usuarios') {
+        window.renderizarAdminTabUsuarios(subContainer);
+    } else if (window.adminSubTabAtiva === 'acessos') {
+        window.renderizarAdminTabAcessos(subContainer);
+    } else if (window.adminSubTabAtiva === 'financeiro') {
+        window.renderizarAdminTabFinanceiro(subContainer);
+    }
+};
+
+window.renderizarSubTabAdmin = function(tabName) {
+    window.adminSubTabAtiva = tabName;
+    window.renderizarAdminPanel();
+};
+
+// 1. ABA GERAL: STATUS DO ASSISTENTE E MOCK LOGS
+window.renderizarAdminTabGeral = function(container) {
+    let logsHTML = "";
+    window.assistantActiveLogs.forEach(l => {
+        logsHTML += `
+            <div style="font-family: monospace; font-size: 0.82rem; background-color: var(--bg-primary); border: 1px solid var(--border); border-radius: 8px; padding: 10px; color: var(--text-primary); display:flex; gap:10px;">
+                <span style="color: var(--accent); font-weight: bold;">[${l.hora}]</span>
+                <span>${l.acao}</span>
+            </div>
+        `;
+    });
+
+    container.innerHTML = `
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:25px;">
+            <!-- Controle do Assistente -->
+            <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 25px; background-color: var(--bg-card); display:flex; flex-direction:column; justify-content:space-between;">
+                <div>
+                    <h2 style="font-size:1.2rem; font-weight:850; color:var(--text-primary); margin-bottom:15px; border-bottom:1.5px solid var(--border); padding-bottom:10px;">🤖 Estado do Assistente Pessoal</h2>
+                    <p style="font-size:0.9rem; color:var(--text-secondary); margin-bottom:20px;">
+                        Gerencie a disponibilidade geral do assistente de inteligência de curação e engenharia reversa para os estudantes.
+                    </p>
+                    
+                    <div style="display:flex; align-items:center; justify-content:space-between; background-color:var(--bg-primary); border:1px solid var(--border); padding:15px; border-radius:12px; margin-bottom:20px;">
+                        <div>
+                            <span style="font-weight:bold; font-size:0.95rem; display:block; color:var(--text-primary);">Status Operacional</span>
+                            <span style="font-size:0.8rem; color:${window.assistantSystemOnline ? 'var(--correct)' : 'var(--incorrect)'}; font-weight:bold;">
+                                ${window.assistantSystemOnline ? '● Sistema Online' : '● Em Manutenção / Offline'}
+                            </span>
+                        </div>
+                        <button class="btn ${window.assistantSystemOnline ? 'btn-danger' : 'btn-success'}" onclick="window.toggleAssistantStatus()" style="font-weight:bold;">
+                            ${window.assistantSystemOnline ? 'Desativar Assistente' : 'Ativar Assistente'}
+                        </button>
+                    </div>
+
+                    <h3 style="font-size:0.9rem; font-weight:800; color:var(--text-secondary); margin-bottom:10px;">Módulos Adicionais Habilitados:</h3>
+                    <div style="display:flex; flex-direction:column; gap:8px;">
+                        <label style="display:flex; align-items:center; gap:8px; font-size:0.88rem; color:var(--text-primary); cursor:pointer;">
+                            <input type="checkbox" checked style="width:16px; height:16px;"> Transcrição de Áudio
+                        </label>
+                        <label style="display:flex; align-items:center; gap:8px; font-size:0.88rem; color:var(--text-primary); cursor:pointer;">
+                            <input type="checkbox" checked style="width:16px; height:16px;"> Leitor de PDF e Engenharia Reversa Automática
+                        </label>
+                        <label style="display:flex; align-items:center; gap:8px; font-size:0.88rem; color:var(--text-primary); cursor:pointer;">
+                            <input type="checkbox" checked style="width:16px; height:16px;"> Mnemônicos e Resumos por IA
+                        </label>
+                    </div>
+                </div>
+
+                <div style="border-top:1.5px solid var(--border); padding-top:15px; margin-top:20px; font-size:0.8rem; color:var(--text-secondary);">
+                    *A desativação do assistente interrompe temporariamente as respostas do robô de suporte na sala de questões.
+                </div>
+            </div>
+
+            <!-- Logs de Atividade Real -->
+            <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 25px; background-color: var(--bg-card); display:flex; flex-direction:column; justify-content:space-between; min-height:360px;">
+                <div>
+                    <h2 style="font-size:1.2rem; font-weight:850; color:var(--text-primary); margin-bottom:15px; border-bottom:1.5px solid var(--border); padding-bottom:10px;">📋 Logs Recentes do Assistente</h2>
+                    <div style="display:flex; flex-direction:column; gap:8px; max-height:220px; overflow-y:auto; padding-right:5px;">
+                        ${logsHTML}
+                    </div>
+                </div>
+                <div style="display:flex; justify-content:flex-end; margin-top:15px; border-top:1.5px solid var(--border); padding-top:15px;">
+                    <button class="btn btn-outline-secondary btn-sm" onclick="window.limparLogsMock()" style="font-weight:bold;">Limpar Logs</button>
+                </div>
+            </div>
+        </div>
+    `;
+};
+
+window.toggleAssistantStatus = function() {
+    window.assistantSystemOnline = !window.assistantSystemOnline;
+    window.assistantActiveLogs.unshift({
+        hora: new Date().toTimeString().split(' ')[0],
+        acao: `Status do Assistente alterado para: ${window.assistantSystemOnline ? 'ONLINE' : 'OFFLINE'}`
+    });
+    window.renderizarAdminPanel();
+};
+
+window.limparLogsMock = function() {
+    window.assistantActiveLogs = [];
+    window.renderizarAdminPanel();
+};
+
+// 2. ABA USUÁRIOS: GERENCIAMENTO DE CADASTROS MOCKADOS
+window.renderizarAdminTabUsuarios = function(container) {
+    let rowsHTML = "";
+    window.mockAdminUsers.forEach(u => {
+        let planoBadgeColor = "var(--text-secondary)";
+        if (u.plano === "VIP") planoBadgeColor = "#a855f7";
+        else if (u.plano === "Premium") planoBadgeColor = "var(--accent)";
+
+        let statusText = "🟢 Ativo";
+        if (u.status === "Suspenso") statusText = "🔴 Suspenso";
+        else if (u.status === "Inativo") statusText = "⚪ Inativo";
+
+        rowsHTML += `
+            <tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:12px 8px; font-weight:bold; color:var(--text-primary);">${u.nome}</td>
+                <td style="padding:12px 8px; color:var(--text-secondary);">${u.email}</td>
+                <td style="padding:12px 8px; text-align:center; font-weight:bold; color:${planoBadgeColor};">${u.plano}</td>
+                <td style="padding:12px 8px; text-align:center; font-weight:700;">${statusText}</td>
+                <td style="padding:12px 8px; text-align:center; color:var(--text-secondary);">${u.data}</td>
+                <td style="padding:12px 8px; text-align:right;">
+                    <button class="btn btn-outline-secondary btn-sm" onclick="window.toggleUserStatusMock(${u.id})" style="font-size:0.75rem; padding:4px 8px; font-weight:700;">Alternar Status</button>
+                    <button class="btn btn-outline-danger btn-sm" onclick="window.deletarUserMock(${u.id})" style="font-size:0.75rem; padding:4px 8px; font-weight:700; margin-left:5px;">✕</button>
+                </td>
+            </tr>
+        `;
+    });
+
+    container.innerHTML = `
+        <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 25px; background-color: var(--bg-card);">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1.5px solid var(--border); padding-bottom:15px; margin-bottom:20px; flex-wrap:wrap; gap:10px;">
+                <h2 style="font-size: 1.2rem; font-weight: 850; color: var(--text-primary); margin:0;">👥 Gestão de Usuários Cadastrados</h2>
+                <button class="btn btn-primary btn-sm" onclick="window.abrirModalNovoUserMock()" style="font-weight:750;">+ Novo Usuário</button>
+            </div>
+
+            <table style="width:100%; border-collapse:collapse; font-size:0.88rem;">
+                <thead>
+                    <tr style="border-bottom: 2px solid var(--border); text-align:left; color:var(--text-secondary); font-weight:700;">
+                        <th style="padding-bottom:10px;">Nome</th>
+                        <th style="padding-bottom:10px;">E-mail</th>
+                        <th style="padding-bottom:10px; text-align:center;">Plano</th>
+                        <th style="padding-bottom:10px; text-align:center;">Status</th>
+                        <th style="padding-bottom:10px; text-align:center;">Ingresso</th>
+                        <th style="padding-bottom:10px; text-align:right;">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rowsHTML}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Modal Novo Usuário -->
+        <div id="adminNewUserModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background-color:rgba(0,0,0,0.5); z-index:9999; justify-content:center; align-items:center;">
+            <div class="card-base" style="background-color:var(--bg-card); border-radius:16px; width:360px; padding:25px; border: 2px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
+                <h3 style="font-size:1.15rem; font-weight:800; margin-bottom:15px; color:var(--text-primary);">👥 Cadastrar Usuário</h3>
+                
+                <input type="text" id="mockUserName" placeholder="Nome Completo" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); background-color:var(--bg-primary); color:var(--text-primary); font-size:0.9rem; margin-bottom:12px;">
+                <input type="email" id="mockUserEmail" placeholder="E-mail" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); background-color:var(--bg-primary); color:var(--text-primary); font-size:0.9rem; margin-bottom:12px;">
+                
+                <select id="mockUserPlano" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); background-color:var(--bg-primary); color:var(--text-primary); font-size:0.9rem; margin-bottom:20px;">
+                    <option value="Gratuito">Gratuito</option>
+                    <option value="Premium">Premium</option>
+                    <option value="VIP">VIP</option>
+                </select>
+
+                <div style="display:flex; justify-content:flex-end; gap:10px;">
+                    <button class="btn btn-outline-secondary" onclick="window.fecharModalNovoUserMock()">Cancelar</button>
+                    <button class="btn btn-primary" onclick="window.adicionarUserMock()">Cadastrar</button>
+                </div>
+            </div>
+        </div>
+    `;
+};
+
+window.abrirModalNovoUserMock = function() {
+    const m = document.getElementById("adminNewUserModal");
+    if (m) m.style.display = "flex";
+};
+
+window.fecharModalNovoUserMock = function() {
+    const m = document.getElementById("adminNewUserModal");
+    if (m) m.style.display = "none";
+};
+
+window.adicionarUserMock = function() {
+    const nameEl = document.getElementById("mockUserName");
+    const emailEl = document.getElementById("mockUserEmail");
+    const planEl = document.getElementById("mockUserPlano");
+
+    if (nameEl && nameEl.value && emailEl && emailEl.value) {
+        const u = {
+            id: Date.now(),
+            nome: nameEl.value,
+            email: emailEl.value,
+            plano: planEl.value,
+            status: "Ativo",
+            data: new Date().toLocaleDateString('pt-BR')
+        };
+        window.mockAdminUsers.unshift(u);
+        window.fecharModalNovoUserMock();
+        window.renderizarAdminPanel();
+    }
+};
+
+window.toggleUserStatusMock = function(userId) {
+    const u = window.mockAdminUsers.find(x => x.id === userId);
+    if (u) {
+        u.status = u.status === "Ativo" ? "Suspenso" : "Ativo";
+        window.renderizarAdminPanel();
+    }
+};
+
+window.deletarUserMock = function(userId) {
+    window.mockAdminUsers = window.mockAdminUsers.filter(x => x.id !== userId);
+    window.renderizarAdminPanel();
+};
+
+// 3. ABA ACESSOS: CONFIGURAÇÃO DE CHAVES E MATRIZ
+window.renderizarAdminTabAcessos = function(container) {
+    let keysHTML = "";
+    window.mockAdminApiKeys.forEach(k => {
+        keysHTML += `
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding:10px 0;">
+                <div>
+                    <span style="font-weight:bold; font-size:0.9rem; color:var(--text-primary); display:block;">${k.nome}</span>
+                    <code style="font-size:0.75rem; color:var(--text-secondary);">${k.key}</code>
+                </div>
+                <div style="text-align:right;">
+                    <span style="font-size:0.75rem; color:var(--text-secondary); display:block;">Uso: ${k.uso} / ${k.limite}</span>
+                    <span style="font-weight:bold; font-size:0.8rem; color:${k.status === 'Ativa' ? 'var(--correct)' : 'var(--text-secondary)'};">${k.status}</span>
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = `
+        <div style="display:grid; grid-template-columns: 1.1fr 1fr; gap:25px;">
+            <!-- Chaves de API -->
+            <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 25px; background-color: var(--bg-card);">
+                <h2 style="font-size:1.2rem; font-weight:850; color:var(--text-primary); margin-bottom:15px; border-bottom:1.5px solid var(--border); padding-bottom:10px;">🔑 Credenciais de API (Integrações)</h2>
+                <div style="display:flex; flex-direction:column; gap:5px;">
+                    ${keysHTML}
+                </div>
+            </div>
+
+            <!-- Matriz de Acessos -->
+            <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 25px; background-color: var(--bg-card);">
+                <h2 style="font-size:1.2rem; font-weight:850; color:var(--text-primary); margin-bottom:15px; border-bottom:1.5px solid var(--border); padding-bottom:10px;">🛡️ Permissões por Grupo</h2>
+                <table style="width:100%; border-collapse:collapse; font-size:0.85rem; color:var(--text-primary);">
+                    <thead>
+                        <tr style="border-bottom:1px solid var(--border); text-align:left; color:var(--text-secondary);">
+                            <th style="padding-bottom:5px;">Recurso</th>
+                            <th style="text-align:center; padding-bottom:5px;">Estudante</th>
+                            <th style="text-align:center; padding-bottom:5px;">Tutor</th>
+                            <th style="text-align:center; padding-bottom:5px;">Admin</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr style="border-bottom:1px solid var(--border);">
+                            <td style="padding:8px 0;">Resolver Questões</td>
+                            <td style="text-align:center;"><input type="checkbox" checked disabled></td>
+                            <td style="text-align:center;"><input type="checkbox" checked disabled></td>
+                            <td style="text-align:center;"><input type="checkbox" checked disabled></td>
+                        </tr>
+                        <tr style="border-bottom:1px solid var(--border);">
+                            <td style="padding:8px 0;">Modo Laboratório</td>
+                            <td style="text-align:center;"><input type="checkbox" checked disabled></td>
+                            <td style="text-align:center;"><input type="checkbox" checked disabled></td>
+                            <td style="text-align:center;"><input type="checkbox" checked disabled></td>
+                        </tr>
+                        <tr style="border-bottom:1px solid var(--border);">
+                            <td style="padding:8px 0;">Aprovar Questões (Curadoria)</td>
+                            <td style="text-align:center;"><input type="checkbox" disabled></td>
+                            <td style="text-align:center;"><input type="checkbox" checked disabled></td>
+                            <td style="text-align:center;"><input type="checkbox" checked disabled></td>
+                        </tr>
+                        <tr style="border-bottom:1px solid var(--border);">
+                            <td style="padding:8px 0;">Configurações Globais</td>
+                            <td style="text-align:center;"><input type="checkbox" disabled></td>
+                            <td style="text-align:center;"><input type="checkbox" disabled></td>
+                            <td style="text-align:center;"><input type="checkbox" checked disabled></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+};
+
+// 4. ABA FINANCEIRO: RECEITAS MOCKADAS E GRÁFICOS
+window.renderizarAdminTabFinanceiro = function(container) {
+    let billingRows = "";
+    let totalMRR = 0;
+    
+    window.mockAdminTransactions.forEach(t => {
+        if (t.status === "Pago") {
+            totalMRR += t.valor;
+        }
+
+        let statusColor = "var(--text-secondary)";
+        if (t.status === "Pago") statusColor = "var(--correct)";
+        else if (t.status === "Pendente") statusColor = "var(--warning)";
+        else if (t.status === "Falhou") statusColor = "var(--incorrect)";
+
+        billingRows += `
+            <tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:10px 5px; font-weight:bold; color:var(--text-primary);">${t.id}</td>
+                <td style="padding:10px 5px; color:var(--text-primary);">${t.usuario}</td>
+                <td style="padding:10px 5px; text-align:center; color:var(--text-secondary);">${t.metodo}</td>
+                <td style="padding:10px 5px; text-align:center; font-weight:bold; color:var(--text-primary);">R$ ${t.valor.toFixed(2)}</td>
+                <td style="padding:10px 5px; text-align:center; font-weight:bold; color:${statusColor};">${t.status}</td>
+                <td style="padding:10px 5px; text-align:right; color:var(--text-secondary);">${t.data}</td>
+            </tr>
+        `;
+    });
+
+    container.innerHTML = `
+        <!-- Métricas KPI -->
+        <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:20px; margin-bottom:25px;">
+            <div class="card-base" style="border: 1.5px solid var(--border); border-radius:12px; padding:18px; background-color:var(--bg-card);">
+                <span style="font-size:0.75rem; font-weight:700; color:var(--text-secondary); text-transform:uppercase;">Faturamento Mensal (MRR)</span>
+                <strong style="display:block; font-size:1.5rem; font-weight:850; color:var(--accent); margin-top:4px;">R$ ${totalMRR.toFixed(2)}</strong>
+            </div>
+            <div class="card-base" style="border: 1.5px solid var(--border); border-radius:12px; padding:18px; background-color:var(--bg-card);">
+                <span style="font-size:0.75rem; font-weight:700; color:var(--text-secondary); text-transform:uppercase;">ARPU (Ticket Médio)</span>
+                <strong style="display:block; font-size:1.5rem; font-weight:850; color:var(--text-primary); margin-top:4px;">R$ 93,88</strong>
+            </div>
+            <div class="card-base" style="border: 1.5px solid var(--border); border-radius:12px; padding:18px; background-color:var(--bg-card);">
+                <span style="font-size:0.75rem; font-weight:700; color:var(--text-secondary); text-transform:uppercase;">Churn Rate (Cancelamento)</span>
+                <strong style="display:block; font-size:1.5rem; font-weight:850; color:var(--incorrect); margin-top:4px;">2,4%</strong>
+            </div>
+            <div class="card-base" style="border: 1.5px solid var(--border); border-radius:12px; padding:18px; background-color:var(--bg-card);">
+                <span style="font-size:0.75rem; font-weight:700; color:var(--text-secondary); text-transform:uppercase;">Transações Concluídas</span>
+                <strong style="display:block; font-size:1.5rem; font-weight:850; color:var(--correct); margin-top:4px;">${window.mockAdminTransactions.filter(x => x.status === 'Pago').length}</strong>
+            </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1.2fr; gap:25px; margin-bottom:25px;">
+            <!-- Gráfico de Receita -->
+            <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 25px; background-color: var(--bg-card);">
+                <h2 style="font-size:1.1rem; font-weight:800; color:var(--text-primary); margin-bottom:15px;">📈 Evolução de Faturamento</h2>
+                <div class="chart-container-planner" style="height:210px;">
+                    <canvas id="admin-finance-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- Tabela de Transações -->
+            <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 25px; background-color: var(--bg-card); display:flex; flex-direction:column; justify-content:space-between;">
+                <div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:12px;">
+                        <h2 style="font-size:1.1rem; font-weight:800; color:var(--text-primary); margin:0;">💳 Transações Recentes</h2>
+                        <button class="btn btn-outline-primary btn-sm" onclick="window.abrirModalVendaMock()" style="font-weight:750; font-size:0.8rem;">+ Registrar Faturamento</button>
+                    </div>
+
+                    <table style="width:100%; border-collapse:collapse; font-size:0.82rem;">
+                        <thead>
+                            <tr style="border-bottom:1.5px solid var(--border); text-align:left; color:var(--text-secondary);">
+                                <th style="padding-bottom:5px;">ID</th>
+                                <th style="padding-bottom:5px;">Usuário</th>
+                                <th style="padding-bottom:5px; text-align:center;">Método</th>
+                                <th style="padding-bottom:5px; text-align:center;">Valor</th>
+                                <th style="padding-bottom:5px; text-align:center;">Status</th>
+                                <th style="padding-bottom:5px; text-align:right;">Data</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${billingRows}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Nova Venda -->
+        <div id="adminNewSaleModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background-color:rgba(0,0,0,0.5); z-index:9999; justify-content:center; align-items:center;">
+            <div class="card-base" style="background-color:var(--bg-card); border-radius:16px; width:350px; padding:25px; border: 2px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
+                <h3 style="font-size:1.15rem; font-weight:800; margin-bottom:15px; color:var(--text-primary);">💰 Registrar Venda</h3>
+                
+                <input type="text" id="mockSaleUser" placeholder="Nome do Comprador" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); background-color:var(--bg-primary); color:var(--text-primary); font-size:0.9rem; margin-bottom:12px;">
+                <input type="number" id="mockSaleValor" placeholder="Valor (ex: 79.90)" step="0.01" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); background-color:var(--bg-primary); color:var(--text-primary); font-size:0.9rem; margin-bottom:12px;">
+                
+                <select id="mockSaleMetodo" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); background-color:var(--bg-primary); color:var(--text-primary); font-size:0.9rem; margin-bottom:20px;">
+                    <option value="Pix">Pix</option>
+                    <option value="Cartão">Cartão de Crédito</option>
+                    <option value="Boleto">Boleto Bancário</option>
+                </select>
+
+                <div style="display:flex; justify-content:flex-end; gap:10px;">
+                    <button class="btn btn-outline-secondary" onclick="window.fecharModalVendaMock()">Cancelar</button>
+                    <button class="btn btn-primary" onclick="window.adicionarVendaMock()">Confirmar Venda</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    setTimeout(() => {
+        window.renderizarGraficoFinanceiro();
+    }, 100);
+};
+
+window.abrirModalVendaMock = function() {
+    const m = document.getElementById("adminNewSaleModal");
+    if (m) m.style.display = "flex";
+};
+
+window.fecharModalVendaMock = function() {
+    const m = document.getElementById("adminNewSaleModal");
+    if (m) m.style.display = "none";
+};
+
+window.adicionarVendaMock = function() {
+    const userEl = document.getElementById("mockSaleUser");
+    const valorEl = document.getElementById("mockSaleValor");
+    const metodoEl = document.getElementById("mockSaleMetodo");
+
+    if (userEl && userEl.value && valorEl && valorEl.value) {
+        const val = parseFloat(valorEl.value);
+        const t = {
+            id: "TX_" + (9900 + window.mockAdminTransactions.length + 1),
+            usuario: userEl.value,
+            valor: val,
+            data: new Date().toLocaleDateString('pt-BR'),
+            status: "Pago",
+            metodo: metodoEl.value
+        };
+        window.mockAdminTransactions.unshift(t);
+        window.fecharModalVendaMock();
+        window.renderizarAdminPanel();
+    }
+};
+
+window.renderizarGraficoFinanceiro = function() {
+    const ctx = document.getElementById('admin-finance-chart')?.getContext('2d');
+    if (!ctx) return;
+    const rootStyle = getComputedStyle(document.documentElement);
+    const accentColor = rootStyle.getPropertyValue('--accent').trim() || '#3b82f6';
+    const textSecColor = rootStyle.getPropertyValue('--text-secondary').trim() || '#475569';
+    
+    // Obter dados recentes baseados no totalMRR atual
+    let totalMRRPago = 0;
+    window.mockAdminTransactions.forEach(t => {
+        if (t.status === "Pago") totalMRRPago += t.valor;
+    });
+
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: ['Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul'],
+            datasets: [{
+                label: 'Receita Mensal (R$)',
+                data: [1200, 1850, 2400, 3100, 4250, totalMRRPago],
+                borderColor: accentColor,
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: 'rgba(0,0,0,0.03)' },
+                    ticks: { color: textSecColor, font: { size: 9 } }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { color: textSecColor, font: { size: 9 } }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
 };
