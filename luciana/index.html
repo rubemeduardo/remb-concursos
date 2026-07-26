@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>REMB Concursos - Plataforma de Estudos</title>
+    
+    <!-- Meta tags SEO -->
+    <meta name="description" content="Plataforma de estudos ativa e de alto rendimento para concursos públicos.">
+    <meta name="keywords" content="sala de questões, concurso público, estudo ativo, lei seca, mnemônicos">
+    
+    <!-- Bootstrap 5.3.3 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Swiper 11 CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
+    
+    <!-- CSS principal (Customizado) -->
+    <link rel="stylesheet" href="../css/style.css">
+    
+    <!-- Elemento para estilo dinâmico de seleção de texto -->
+    <style id="dynamic-selection-style"></style>
+</head>
+<body>
+
+    <!-- Topbar Mobile -->
+    <div class="mobile-topbar" style="display: none;">
+        <button class="btn-burger" onclick="toggleMobileSidebar()">☰</button>
+        <div class="app-logo-mobile">🎓 REMB <span>ESTUDOS</span></div>
+    </div>
+    
+    <!-- Backdrop do Menu Lateral no Mobile -->
+    <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleMobileSidebar()"></div>
+
+    <!-- APLICATIVO SPA CONTAINER -->
+    <div class="app-layout">
+        
+        <!-- SIDEBAR DE NAVEGAÇÃO -->
+        <aside class="app-sidebar">
+            <button class="btn-collapse-sidebar" onclick="toggleSidebarCollapse()" title="Recolher/Expandir menu" id="btnCollapseSidebar">
+                <span class="icon-arrow">◀</span>
+            </button>
+            <div class="sidebar-header">
+                <div class="app-logo" style="cursor: pointer;" onclick="navegarPara('dashboard')">
+                    <span>🎓</span>
+                    <h2 class="logo-text">REMB <span>ESTUDOS</span></h2>
+                </div>
+            </div>
+            
+            <nav class="sidebar-menu">
+                <button class="menu-item active" id="btn-nav-dashboard" onclick="navegarPara('dashboard')">
+                    <span class="menu-icon">🏠</span>
+                    <span class="menu-label">Início</span>
+                </button>
+                <button class="menu-item" id="btn-nav-questoes" onclick="navegarPara('questoes')">
+                    <span class="menu-icon">✍️</span>
+                    <span class="menu-label">Sala de Questões</span>
+                </button>
+                <button class="menu-item" id="btn-nav-provas" onclick="navegarPara('provas')">
+                    <span class="menu-icon">📄</span>
+                    <span class="menu-label">Provas</span>
+                </button>
+                
+                <button class="menu-item" id="btn-nav-caderno-erros" onclick="navegarPara('caderno-erros')">
+                    <span class="menu-icon">📕</span>
+                    <span class="menu-label">Caderno de Erros</span>
+                    <span class="badge" id="badge-erros">0</span>
+                </button>
+                <button class="menu-item" id="btn-nav-favoritas" onclick="navegarPara('favoritas')">
+                    <span class="menu-icon">⭐</span>
+                    <span class="menu-label">Favoritas</span>
+                    <span class="badge" id="badge-favoritas">0</span>
+                </button>
+                <button class="menu-item" id="btn-nav-minhas-notas" onclick="navegarPara('minhas-notas')">
+                    <span class="menu-icon">✏️</span>
+                    <span class="menu-label">Minhas Notas</span>
+                </button>
+                <button class="menu-item" id="btn-nav-estatisticas" onclick="navegarPara('estatisticas')">
+                    <span class="menu-icon">📊</span>
+                    <span class="menu-label">Estatísticas</span>
+                </button>
+                <button class="menu-item" id="btn-nav-planner" onclick="navegarPara('planner')">
+                    <span class="menu-icon">📅</span>
+                    <span class="menu-label">Planejamento</span>
+                </button>
+                <button class="menu-item" id="btn-nav-configuracoes" onclick="navegarPara('configuracoes')">
+                    <span class="menu-icon">⚙️</span>
+                    <span class="menu-label">Ajustes</span>
+                </button>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <!-- Controle de Cronômetro Flutuante -->
+                <div class="sidebar-timer">
+                    <span class="timer-icon">⏱️</span>
+                    <span id="timerDisplay">00:00</span>
+                    <button class="timer-action-btn" id="playPauseBtn" onclick="toggleTimer()" title="Pausar/Retomar">⏸️</button>
+                </div>
+                
+                <!-- Toggle de Tema Escuro -->
+                <button class="theme-switch-btn" onclick="toggleTheme()" id="themeToggleBtn" title="Alternar tema">
+                    🌙 <span class="theme-label">Modo Escuro</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- CONTEÚDO PRINCIPAL -->
+        <main class="app-content">
+            
+            <!-- SEÇÃO 1: DASHBOARD (HOME) -->
+            <section id="section-dashboard" class="content-section active">
+                <div class="section-header">
+                    <h1>Área de Estudos REMB <span class="username">Estudante</span>! 🎯</h1>
+                    <p class="section-subtitle">Acompanhe seu progresso por engenharia reversa em tempo real.</p>
+                </div>
+                
+                <!-- Grid de Métricas Principais (Bootstrap cards) -->
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-icon">📝</div>
+                        <div class="metric-info">
+                            <span class="metric-title">Respondidas</span>
+                            <span class="metric-value" id="dashTotal">0</span>
+                        </div>
+                    </div>
+                    <div class="metric-card success">
+                        <div class="metric-icon">🟢</div>
+                        <div class="metric-info">
+                            <span class="metric-title">Acertos</span>
+                            <span class="metric-value" id="dashAcertos">0</span>
+                        </div>
+                    </div>
+                    <div class="metric-card danger">
+                        <div class="metric-icon">🔴</div>
+                        <div class="metric-info">
+                            <span class="metric-title">Erros</span>
+                            <span class="metric-value" id="dashErros">0</span>
+                        </div>
+                    </div>
+                    <div class="metric-card accent">
+                        <div class="metric-icon">📈</div>
+                        <div class="metric-info">
+                            <span class="metric-title">Aproveitamento</span>
+                            <span class="metric-value" id="dashAproveitamento">0%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Painel de Detalhes de Desempenho e Matérias -->
+                <div class="dashboard-details-grid">
+                    <div class="details-card">
+                        <h3>📊 Aproveitamento por Disciplina</h3>
+                        <div class="disciplines-container" id="disciplinesProgressList">
+                            <!-- Injetado por JS -->
+                        </div>
+                    </div>
+                    
+                    <div class="details-card info-card">
+                        <h3>💡 Estudo Ativo e Engenharia Reversa</h3>
+                        <p>Aproveite ao máximo nossa plataforma de estudos:</p>
+                        <ul class="study-tips-list">
+                            <li><span>💬</span> <strong>Modo Correção:</strong> Ao responder, entre no modo correção para ver os balões estilo quadrinhos apontando direto no texto.</li>
+                            <li><span>✏️</span> <strong>Caneta e Borracha:</strong> Use a barra móvel de marcação lateral para pintar termos-chave com 4 cores ou apagá-los.</li>
+                            <li><span>❌</span> <strong>x taxativo:</strong> Clique no botão `✖` nas alternativas para tachar as erradas.</li>
+                            <li><span>💾</span> <strong>Minhas Notas:</strong> Salve explicações dos balões ou digite suas notas para vê-las todas na aba dedicada.</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SEÇÃO 2: SALA DE QUESTÕES -->
+            <section id="section-questoes" class="content-section">
+                <div class="section-header">
+                    <h1>✍️ Sala de Questões</h1>
+                    <p class="section-subtitle">Resolva e analise questões com nosso assistente pedagógico integrado.</p>
+                </div>
+                
+                <!-- Painel de Filtros e Busca -->
+                <div class="filters-panel">
+                    <div class="filter-row">
+                        <div class="filter-group">
+                            <label for="filterDisciplina">Disciplina</label>
+                            <select id="filterDisciplina" onchange="aplicarFiltros()">
+                                <option value="todas">Todas as Disciplinas</option>
+                                <!-- Injetado por JS -->
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="filterAssunto">Assunto</label>
+                            <select id="filterAssunto" onchange="aplicarFiltros()">
+                                <option value="todos">Todos os Assuntos</option>
+                                <!-- Injetado por JS -->
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="filterBanca">Banca</label>
+                            <select id="filterBanca" onchange="aplicarFiltros()">
+                                <option value="todas">Todas as Bancas</option>
+                                <option value="FGV">FGV</option>
+                                <option value="Cebraspe">Cebraspe</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="filterListaOrigem">Lista de Origem</label>
+                            <select id="filterListaOrigem" onchange="aplicarFiltros()">
+                                <option value="todas">Todas as Listas</option>
+                                <!-- Injetado por JS -->
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="filterStatus">Status</label>
+                            <select id="filterStatus" onchange="aplicarFiltros()">
+                                <option value="todos">Todas</option>
+                                <option value="nao_respondidas">Não respondidas</option>
+                                <option value="acertadas">Acertadas</option>
+                                <option value="erradas">Erradas</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Filtros Extras de Testes (Simulado, Relevância) -->
+                    <div class="filter-row" style="margin-top: 12px; display: flex; gap: 20px; align-items: center; background-color: var(--bg-card); padding: 12px 18px; border-radius: 8px; border: 1.5px solid var(--border);">
+                        <div class="form-check form-switch" style="display:flex; align-items:center; gap:8px;">
+                            <input class="form-check-input" type="checkbox" id="toggleModoSimulado" onchange="alternarModoSimulado()">
+                            <label class="form-check-label" for="toggleModoSimulado" style="font-weight: 700; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; gap: 5px; margin-bottom: 0;">
+                                📝 Modo Simulado (Silencioso)
+                            </label>
+                        </div>
+                        <div class="form-check form-switch" style="display:flex; align-items:center; gap:8px;">
+                            <input class="form-check-input" type="checkbox" id="toggleAssuntosCobrados" onchange="aplicarFiltros()">
+                            <label class="form-check-label" for="toggleAssuntosCobrados" style="font-weight: 700; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; gap: 5px; margin-bottom: 0;">
+                                🔥 Apenas Assuntos Mais Cobrados
+                            </label>
+                        </div>
+                        <button class="btn btn-primary btn-sm" id="btnFinalizarSimulado" onclick="finalizarSimulado()" style="display: none; margin-left: auto; border-radius: 8px; font-weight: 600; box-shadow: 2px 2px 0px #000; border: 1.5px solid #000;">
+                            🏁 Finalizar Simulado
+                        </button>
+                    </div>
+                    
+                    <!-- Busca Avançada por Tags (Estilo Tags-Input) -->
+                    <div class="filter-row search-row">
+                        <div class="tags-input-container">
+                            <span class="search-icon">🏷️</span>
+                            <div class="tags-pill-wrapper" id="tagsPillWrapper">
+                                <!-- As tags ativas entrarão aqui como blocos -->
+                            </div>
+                            
+                            <div class="input-autocomplete-wrapper" style="position: relative; flex: 1; display: flex;">
+                                <!-- Texto fantasma para sugestão inline -->
+                                <span id="ghostSuggestion" style="position: absolute; left: 0; top: 50%; transform: translateY(-50%); color: #cbd5e1; pointer-events: none; font-size: 0.95rem; white-space: pre; font-family: var(--font-body);"></span>
+                                <input type="text" id="searchTags" placeholder="Digite uma tag (ex: pegadinha, LRF) e dê Enter..." autocomplete="off" style="position: relative; background: transparent; z-index: 2; width: 100%; border: none; outline: none; padding: 4px 0;">
+                            </div>
+                            
+                            <!-- Dropdown de Autocompletar Tags -->
+                            <div class="autocomplete-tags-dropdown" id="autocompleteTagsDropdown" style="display: none;">
+                                <!-- Sugestões dinâmicas injetadas por JS -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Container de Questões -->
+                <div class="questoes-list" id="questoesContainer">
+                    <!-- Injetado por JS -->
+                </div>
+            </section>
+
+            <!-- SEÇÃO 7: LABORATÓRIO DE VALIDAÇÃO -->
+            <section id="section-validacao" class="content-section">
+                <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap: wrap; gap: 15px;">
+                    <div>
+                        <h1>🧪 Laboratório de Validação</h1>
+                        <p class="section-subtitle">Examine as afirmativas de Certo/Errado antes de integrá-las. <strong id="curacao-status" style="margin-left: 10px;">0 aprovadas para envio</strong>.</p>
+                    </div>
+                    <button class="btn btn-success font-weight-bold" onclick="integrarQuestoesCespeValidadas()" style="padding: 12px 24px; border-radius:12px; font-size:1rem; border:2.5px solid #000; box-shadow: 4px 4px 0px #000; font-weight:700;">
+                        ✅ Solicitar Integração no Chat
+                    </button>
+                </div>
+                
+                <!-- Filtros e Busca da Validação -->
+                <div class="filters-panel">
+                    <div class="filter-row">
+                        <div class="filter-group">
+                            <label for="filterListaVal">Lista de Origem</label>
+                            <select id="filterListaVal" onchange="aplicarFiltrosVal()">
+                                <option value="todas">Todas as Listas</option>
+                                <!-- Preenchido dinamicamente por JS -->
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="filterStatusVal">Status / Filtro</label>
+                            <select id="filterStatusVal" onchange="aplicarFiltrosVal()">
+                                <option value="todas">Todas as Questões</option>
+                                <option value="aprovadas">Aprovadas (Consistentes)</option>
+                                <option value="pendentes">Pendentes de Curadoria</option>
+                                <option value="com_gabarito">Com Gabarito identificado</option>
+                                <option value="sem_gabarito">Sem Gabarito (Para preencher)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Container de Questões de Validação -->
+                <div class="questoes-list" id="validacaoContainer">
+                    <!-- Injetado por JS -->
+                </div>
+            </section>
+
+            <!-- SEÇÃO 3: CADERNO DE ERROS -->
+            <section id="section-caderno-erros" class="content-section">
+                <div class="section-header">
+                    <h1>📕 Caderno de Erros</h1>
+                    <p class="section-subtitle">Aqui estão reunidas as questões que você errou. Refaça-as para fortalecer sua retenção.</p>
+                </div>
+                
+                <!-- Container do Caderno de Erros -->
+                <div class="questoes-list" id="cadernoErrosContainer">
+                    <!-- Injetado por JS -->
+                </div>
+            </section>
+
+            <!-- SEÇÃO 4: FAVORITAS -->
+            <section id="section-favoritas" class="content-section">
+                <div class="section-header">
+                    <h1>⭐ Questões Favoritas</h1>
+                    <p class="section-subtitle">Revise e resolva rapidamente as questões que você favoritou para revisão futura.</p>
+                </div>
+                
+                <!-- Container de Favoritas -->
+                <div class="questoes-list" id="favoritasContainer">
+                    <!-- Injetado por JS -->
+                </div>
+            </section>
+
+            <!-- SEÇÃO 5: MINHAS NOTAS -->
+            <section id="section-minhas-notas" class="content-section">
+                <div class="section-header">
+                    <h1>✏️ Minhas Notas & Explicações</h1>
+                    <p class="section-subtitle">Revise todas as suas anotações pessoais e explicações salvas dos balões pedagógicos.</p>
+                </div>
+                
+                <!-- Container de Notas -->
+                <div class="row g-4" id="minhasNotasContainer">
+                    <!-- Injetado por JS -->
+                </div>
+            </section>
+
+            <!-- SEÇÃO 6: CONFIGURAÇÕES / AJUSTES -->
+            <section id="section-configuracoes" class="content-section">
+                <div class="section-header">
+                    <h1>⚙️ Ajustes e Configurações</h1>
+                    <p class="section-subtitle">Gerencie suas preferências e dados locais da plataforma.</p>
+                </div>
+                
+                <div class="config-card">
+                    <h3>💡 Intensidade dos Marcadores de Texto</h3>
+                    <p>Ajuste o nível de transparência das cores dos grifos no enunciado (entre 15% e 75%).</p>
+                    <div style="display:flex; align-items:center; gap:15px; margin-top:10px;">
+                        <input type="range" id="opacitySlider" min="15" max="75" value="45" oninput="alterarOpacidadeGrifos(this.value)" style="flex:1; cursor:pointer;">
+                        <span id="opacityDisplay" style="font-weight:700; width:45px; text-align:right;">45%</span>
+                    </div>
+                </div>
+
+                <div class="config-card" style="margin-top:20px;">
+                    <h3>👁️ Estudo Ativo: Revelar Incorreção</h3>
+                    <p>Ao ativar, você pode passar o mouse sobre os termos incorretos tachados para ver a correção detalhada.</p>
+                    <div class="form-check form-switch" style="margin-top:10px; display:flex; align-items:center; gap:8px;">
+                        <input class="form-check-input" type="checkbox" id="toggleHoverCorretivo" onchange="alternarHoverCorretivo(this.checked)" checked style="cursor:pointer;">
+                        <label class="form-check-label" for="toggleHoverCorretivo" style="font-weight:600; cursor:pointer; margin-bottom:0;">Revelar termos corretos no hover</label>
+                    </div>
+                </div>
+
+                <div class="config-card" style="margin-top:20px;">
+                    <h3>🗑️ Limpar Progresso e Histórico</h3>
+                    <p>Isso apagará todo o seu progresso de acertos/erros, anotações de fóruns e favoritos salvos localmente neste navegador.</p>
+                    <button class="btn-danger" onclick="resetarDadosGerais()">
+                        Limpar Todos os Dados
+                    </button>
+                </div>
+            </section>
+
+            <!-- SEÇÃO 8: BIBLIOTECA DE PROVAS -->
+            <section id="section-provas" class="content-section">
+                <!-- Banner Premium -->
+                <div class="prova-banner">
+                    <h1 class="prova-banner-title">📄 Biblioteca de Provas</h1>
+                    <p class="prova-banner-desc">Explore o repositório de cadernos de provas aplicados desde 2016 pelas principais bancas e impulsione seus estudos por Engenharia Reversa.</p>
+                </div>
+
+                <!-- Painel de Estatísticas / Resumo das Provas -->
+                <div class="prova-stats-row">
+                    <div class="prova-stat-card" onclick="selecionarBancaTab('todas')" title="Ver todas as provas">
+                        <span style="font-size:1.6rem;">📚</span>
+                        <div>
+                            <div class="prova-stat-number" id="stats-total-provas">37</div>
+                            <div class="prova-stat-label">Total Provas</div>
+                        </div>
+                    </div>
+                    <div class="prova-stat-card" onclick="selecionarBancaTab('Cebraspe')" title="Ver provas do Cebraspe">
+                        <span style="font-size:1.6rem; color:#3b82f6;">🔵</span>
+                        <div>
+                            <div class="prova-stat-number">11</div>
+                            <div class="prova-stat-label">Cebraspe</div>
+                        </div>
+                    </div>
+                    <div class="prova-stat-card" onclick="selecionarBancaTab('FGV')" title="Ver provas da FGV">
+                        <span style="font-size:1.6rem; color:#f59e0b;">🟡</span>
+                        <div>
+                            <div class="prova-stat-number">11</div>
+                            <div class="prova-stat-label">FGV</div>
+                        </div>
+                    </div>
+                    <div class="prova-stat-card" onclick="selecionarBancaTab('Cesgranrio')" title="Ver provas da Cesgranrio">
+                        <span style="font-size:1.6rem; color:#10b981;">🟢</span>
+                        <div>
+                            <div class="prova-stat-number">9</div>
+                            <div class="prova-stat-label">Cesgranrio</div>
+                        </div>
+                    </div>
+                    <div class="prova-stat-card" onclick="selecionarBancaTab('FCC')" title="Ver provas da FCC">
+                        <span style="font-size:1.6rem; color:#ec4899;">💗</span>
+                        <div>
+                            <div class="prova-stat-number">8</div>
+                            <div class="prova-stat-label">FCC</div>
+                        </div>
+                    </div>
+                    <div class="prova-stat-card" onclick="selecionarBancaTab('Vunesp')" title="Ver provas da Vunesp">
+                        <span style="font-size:1.6rem; color:#a855f7;">🟣</span>
+                        <div>
+                            <div class="prova-stat-number" id="stats-vunesp-number">9</div>
+                            <div class="prova-stat-label">Vunesp</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Abas Rápidas de Bancas (Tabs) -->
+                <div class="banca-tabs" id="bancaTabsWrapper">
+                    <button class="banca-tab active" data-banca="todas" onclick="selecionarBancaTab('todas')">Todas as Bancas</button>
+                    <button class="banca-tab" data-banca="Cebraspe" onclick="selecionarBancaTab('Cebraspe')">Cebraspe (CESPE)</button>
+                    <button class="banca-tab" data-banca="FGV" onclick="selecionarBancaTab('FGV')">FGV</button>
+                    <button class="banca-tab" data-banca="Cesgranrio" onclick="selecionarBancaTab('Cesgranrio')">Cesgranrio</button>
+                    <button class="banca-tab" data-banca="FCC" onclick="selecionarBancaTab('FCC')">FCC</button>
+                    <button class="banca-tab" data-banca="Vunesp" onclick="selecionarBancaTab('Vunesp')">Vunesp</button>
+                </div>
+
+                <!-- Linha secundária de Filtros (Ano e Busca) -->
+                <div class="filtros-container card-base" style="margin-bottom: 25px; padding: 15px; display: flex; flex-wrap: wrap; gap: 15px; align-items: center; border: 1.5px solid var(--border); border-radius: 12px; background-color: var(--bg-card);">
+                    <div style="flex: 1; min-width: 150px; display: flex; flex-direction: column; gap: 4px;">
+                        <label for="filterAnoProvas" style="font-size: 0.78rem; font-weight: 700; color: var(--text-secondary);">Ano de Aplicação</label>
+                        <select id="filterAnoProvas" onchange="aplicarFiltrosProvas()" style="width: 100%; padding: 8px; border-radius: 8px; border: 1.5px solid var(--border); background-color: var(--bg-app); color: var(--text-primary); cursor: pointer; font-size: 0.88rem;">
+                            <option value="todos">Todos os Anos</option>
+                            <option value="2026">2026</option>
+                            <option value="2025">2025</option>
+                            <option value="2024">2024</option>
+                            <option value="2023">2023</option>
+                            <option value="2022">2022</option>
+                            <option value="2021">2021</option>
+                            <option value="2020">2020</option>
+                            <option value="2018">2018</option>
+                            <option value="2017">2017</option>
+                            <option value="2016">2016</option>
+                        </select>
+                    </div>
+                    <div style="flex: 3; min-width: 250px; display: flex; flex-direction: column; gap: 4px;">
+                        <label for="searchProva" style="font-size: 0.78rem; font-weight: 700; color: var(--text-secondary);">Busca Textual</label>
+                        <input type="text" id="searchProva" oninput="aplicarFiltrosProvas()" placeholder="Pesquise por órgão, cargo, ano..." style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid var(--border); background-color: var(--bg-app); color: var(--text-primary); font-size: 0.88rem;">
+                    </div>
+                </div>
+
+                <!-- Grid de Provas -->
+                <div class="row g-4" id="provasGridContainer" style="display: flex; flex-wrap: wrap; gap: 20px;">
+                    <!-- Inserido dinamicamente via JS -->
+                </div>
+            </section>
+
+            <!-- SEÇÃO 9: ESTATÍSTICAS DETALHADAS -->
+            <section id="section-estatisticas" class="content-section">
+                <!-- Banner Premium -->
+                <div class="prova-banner" style="background: linear-gradient(135deg, #8b5cf6 0%, var(--accent) 100%); box-shadow: 0 8px 30px rgba(139, 92, 246, 0.15); border: none;">
+                    <h1 class="prova-banner-title">📊 Painel de Performance</h1>
+                    <p class="prova-banner-desc">Analise suas métricas de resolução, tempos gastos e o mapeamento detalhado por disciplinas, assuntos e bancas.</p>
+                </div>
+
+                <!-- Grid de Métricas Gerais -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px;">
+                    <!-- Tempo na Sala -->
+                    <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 20px; text-align: center; background-color: var(--bg-card);">
+                        <span style="font-size: 2.2rem; display: block; margin-bottom: 8px;">⏱️</span>
+                        <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Tempo de Estudo</div>
+                        <div style="font-size: 1.7rem; font-weight: 850; color: var(--text-primary);" id="stats-tempo-estudo">00:00:00</div>
+                    </div>
+                    <!-- Tempo Médio -->
+                    <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 20px; text-align: center; background-color: var(--bg-card);">
+                        <span style="font-size: 2.2rem; display: block; margin-bottom: 8px;">⏳</span>
+                        <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Tempo Médio por Questão</div>
+                        <div style="font-size: 1.7rem; font-weight: 850; color: var(--text-primary);" id="stats-tempo-medio">0s</div>
+                    </div>
+                    <!-- Maior / Menor Tempo -->
+                    <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 20px; text-align: center; background-color: var(--bg-card);">
+                        <span style="font-size: 2.2rem; display: block; margin-bottom: 8px;">🚀</span>
+                        <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Maior / Menor Tempo</div>
+                        <div style="font-size: 1.25rem; font-weight: 850; color: var(--text-primary); display: flex; justify-content: center; gap: 10px; margin-top: 4px;" id="stats-min-max-tempo">
+                            <span style="color: var(--errada);" title="Maior Tempo" id="stats-max-tempo">0s</span>
+                            <span style="color: var(--text-secondary);">/</span>
+                            <span style="color: var(--correta);" title="Menor Tempo" id="stats-min-tempo">0s</span>
+                        </div>
+                    </div>
+                    <!-- Resolvidas / Acertos / Erros -->
+                    <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 20px; text-align: center; background-color: var(--bg-card);">
+                        <span style="font-size: 2.2rem; display: block; margin-bottom: 8px;">🎯</span>
+                        <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Aproveitamento</div>
+                        <div style="font-size: 1.6rem; font-weight: 850; color: var(--text-primary);" id="stats-taxa-acerto">0%</div>
+                        <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 4px;">
+                            <span style="color: var(--correta); font-weight: 700;" id="stats-num-acertos">0 acertos</span> | 
+                            <span style="color: var(--errada); font-weight: 700;" id="stats-num-erros">0 erros</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detalhes por Categorias -->
+                <div class="stats-details-grid">
+                    <!-- Bancas -->
+                    <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 20px; background-color: var(--bg-card);">
+                        <h3 style="font-size: 1.1rem; font-weight: 800; margin-bottom: 15px;">🏛️ Performance por Banca</h3>
+                        <div id="stats-bancas-list" style="display: flex; flex-direction: column; gap: 12px;"></div>
+                    </div>
+
+                    <!-- Cargos -->
+                    <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 20px; background-color: var(--bg-card);">
+                        <h3 style="font-size: 1.1rem; font-weight: 800; margin-bottom: 15px;">💼 Performance por Cargo</h3>
+                        <div id="stats-cargos-list" style="display: flex; flex-direction: column; gap: 12px;"></div>
+                    </div>
+
+                    <!-- Disciplinas -->
+                    <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 20px; background-color: var(--bg-card);">
+                        <h3 style="font-size: 1.1rem; font-weight: 800; margin-bottom: 15px;">📚 Performance por Disciplina</h3>
+                        <div id="stats-disciplinas-list" style="display: flex; flex-direction: column; gap: 12px;"></div>
+                    </div>
+
+                    <!-- Assuntos -->
+                    <div class="card-base" style="border: 1.5px solid var(--border); border-radius: 16px; padding: 20px; background-color: var(--bg-card);">
+                        <h3 style="font-size: 1.1rem; font-weight: 800; margin-bottom: 15px;">🏷️ Performance por Assunto</h3>
+                        <div id="stats-assuntos-list" style="display: flex; flex-direction: column; gap: 12px;"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SEÇÃO 9: PLANNER & CICLOS DE ESTUDO -->
+            <section id="section-planner" class="content-section">
+                <!-- Conteúdo renderizado de forma reativa pelo js/app.js -->
+            </section>
+        </main>
+    </div>
+
+    <!-- MODO FOCO (MODAL FULLSCREEN DE ISOLAMENTO) -->
+    <div class="foco-overlay" id="focoOverlay" onclick="fecharModoFoco()"></div>
+    <div class="foco-modal" id="focoModal">
+        <div class="foco-wrapper">
+            <div class="foco-header">
+                <h3>🔍 Modo Foco - Resolução Ativa</h3>
+                <button class="modal-close-btn" onclick="fecharModoFoco()" title="Fechar modo foco">&times;</button>
+            </div>
+            
+            <div class="foco-body" id="focoModalConteudo">
+                <!-- A questão ativa do foco será injetada aqui -->
+            </div>
+            
+            <div class="foco-footer">
+                <button class="btn-secundario" id="btnFocoAnterior" onclick="anteriorQuestaoFoco()">
+                    ◀ Questão Anterior
+                </button>
+                <span class="foco-tip-label">
+                    Dica: Use as setas ◀ ▶ do teclado para navegar | Teclas A-E para marcar | Enter para responder
+                </span>
+                <button class="btn-secundario" id="btnFocoProximo" onclick="proximaQuestaoFoco()">
+                    Próxima Questão ▶
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- BALÃO EXPLICATIVO PEDAGÓGICO (ESTILO COMIC/QUADRINHOS) -->
+    <div id="balao-pedagogico" class="balao-explicativo-popup" style="display: none;">
+        <div class="balao-body" id="balao-conteudo"></div>
+        <div class="balao-footer-comic">
+            <button class="btn-balao-action btn-salvar-nota" onclick="salvarBalaoEmMinhasNotas()" title="Salvar explicação nas Minhas Notas">
+                💾 Salvar Nota
+            </button>
+            <div class="balao-nav-btns">
+                <button class="btn-balao-nav" id="btn-balao-voltar" onclick="voltarPassoBalao()">◀</button>
+                <span id="balao-passo-label">1/4</span>
+                <button class="btn-balao-nav btn-avancar" id="btn-balao-avancar" onclick="avancarPassoBalao()">▶</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- BARRA MÓVEL DE MARCAÇÃO FLUTUANTE ARRASTÁVEL (STICKY HIGHLIGHTER) -->
+    <div class="sticky-highlighter-bar" id="stickyHighlighterBar">
+        <div class="highlighter-drag-handle" id="highlighterDragHandle" title="Clique e arraste para reposicionar a barra">⋮⋮</div>
+        <div class="highlighter-title" style="margin-bottom: 4px;">🖍️ Caneta</div>
+        
+        <div class="highlighter-body-wrapper" style="display: flex; flex-direction: row; gap: 12px; align-items: stretch; width: 100%;">
+            <!-- Lado esquerdo: botões de cores -->
+            <div class="highlighter-colors-column" style="display: flex; flex-direction: column; gap: 10px; align-items: center;">
+                <button class="highlighter-color btn-amarelo active" onmousedown="event.preventDefault()" onclick="setCanetaAtiva('yellow', this)" title="Amarelo: Palavras-chave / Restrições / Exceções"></button>
+                <button class="highlighter-color btn-verde" onmousedown="event.preventDefault()" onclick="setCanetaAtiva('green', this)" title="Verde: Comando da Questão (Ação)"></button>
+                <button class="highlighter-color btn-azul" onmousedown="event.preventDefault()" onclick="setCanetaAtiva('blue', this)" title="Azul: Normas e Leis (Artigos, Resoluções)"></button>
+                <button class="highlighter-color btn-rosa" onmousedown="event.preventDefault()" onclick="setCanetaAtiva('pink', this)" title="Rosa: Datas, Prazos e Períodos temporais"></button>
+                <button class="highlighter-color btn-laranja" onmousedown="event.preventDefault()" onclick="setCanetaAtiva('orange', this)" title="Laranja: Situação Fática / Fatos Relevantes"></button>
+                <button class="highlighter-eraser" onmousedown="event.preventDefault()" onclick="setCanetaAtiva('eraser', this)" title="Borracha (Apagar trechos selecionados)"></button>
+            </div>
+            
+            <!-- Linha vertical divisória -->
+            <div class="highlighter-divider" style="width: 1.5px; background-color: var(--border); margin: 0 2px;"></div>
+            
+            <!-- Lado direito: Controle vertical de opacidade/tonalidade -->
+            <div class="highlighter-opacity-control" style="display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 4px 0; position: relative;">
+                <span style="font-size: 0.65rem; font-weight: 800; color: var(--text-secondary); cursor: default; user-select: none;" title="Tonalidade Forte">➕</span>
+                
+                <div class="vertical-slider-container" id="verticalOpacitySliderContainer" onmousedown="event.preventDefault()" style="height: 140px; width: 22px; position: relative; display: flex; justify-content: center; align-items: center; cursor: pointer;" title="Arraste para ajustar a opacidade da caneta">
+                    <!-- A linha vertical de trilha -->
+                    <div class="vertical-slider-track" style="position: absolute; width: 4px; height: 100%; background-color: var(--border); border-radius: 2px;"></div>
+                    <!-- Preenchimento dinâmico -->
+                    <div class="vertical-slider-fill" id="highlighterOpacityFill" style="position: absolute; bottom: 0; width: 4px; height: 50%; background-color: var(--accent); border-radius: 2px;"></div>
+                    <!-- O botão/alça (handle) do slider -->
+                    <div class="vertical-slider-handle" id="highlighterOpacityHandle" style="position: absolute; bottom: calc(50% - 8px); width: 14px; height: 14px; border-radius: 50%; background-color: #ffffff; border: 2.5px solid #000000; box-shadow: 0 2px 4px rgba(0,0,0,0.15); z-index: 2;"></div>
+                </div>
+                
+                <span style="font-size: 0.65rem; font-weight: 800; color: var(--text-secondary); cursor: default; user-select: none;" title="Tonalidade Fraca">➖</span>
+            </div>
+        </div>
+        <!-- Dica Semântica Flutuante -->
+        <div id="highlighterSemanticTip" style="font-size: 0.62rem; font-weight: 700; color: var(--text-secondary); text-align: center; border-top: 1.5px solid var(--border); padding-top: 8px; margin-top: 4px; width: 100%; max-width: 100px; line-height: 1.25; user-select: none; cursor: default;">
+            Selecione uma Caneta
+        </div>
+    </div>
+
+    <!-- BOTÃO FLUTUANTE PARA SAIR DO MODO CORREÇÃO -->
+    <div id="btn-sair-correcao" class="btn-sair-correcao-flutuante" onclick="fecharModoCorrecao()" style="display: none;">
+        Sair do Modo Correção ✕
+    </div>
+
+    <!-- GSAP (GreenSock Animation Platform) -->
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+    
+    <!-- Swiper 11 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+
+    <!-- Bootstrap 5.3.3 JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bundle.min.js"></script>
+
+    <!-- MathJax for LaTeX equations -->
+    <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']]
+      },
+      svg: {
+        fontCache: 'global'
+      }
+    };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+    <!-- JS SCRIPTS -->
+    <script src="../js/banco_questoes.js"></script>
+    <script src="../js/questoes_cespe_tratadas.js"></script>
+    <script src="../js/app.js"></script>
+</body>
+</html>
